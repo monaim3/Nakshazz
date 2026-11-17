@@ -108,3 +108,26 @@ Same effect as the nakshazz.com coming-soon page: leaf-shaped petals (`rounded-[
 - **Quick view** (`QuickView.js`): native `<dialog>` (focus trap, Esc, backdrop click closes), mounted only once opened. Fetches `/products/{slug}` client-side: gallery with thumbnails, category, price (per variant), stock badge (in stock / only N left / made to order / sold out, from `stock_status` + `low_stock_count`), option chips (only when variants differ), quantity stepper capped at `max_quantity`, Add to bag (`addToCart` in `lib/cart-storage.js`, merges lines), heart, "View full details".
 - **Favourites** (`lib/wishlist-storage.js`): browser-only (guest shop, no accounts), localStorage `nakshazz-wishlist-v1`, max 100, each entry a card snapshot so `/wishlist` renders without an API call. `useSyncExternalStore` with a cached snapshot. Header heart with count (lotus badge). `/wishlist` page is `noindex`. EN/BN text in dictionaries (`product.*`, `nav.favourites`, `wishlist.*`).
 - **Variant picker** (`VariantPicker.js`, used by quick view and later the product page): a single colour/metal option ("Color", "Metal", "Finish", "রং") with known values renders round swatches ("COLOR Golden"); metals use gradients (`lib/swatches.js`: golden, antique gold, silver, oxidised, rose gold, copper, bronze, plus plain colours and Bangla names). Unknown values fall back to text chips. Sold-out variants are crossed out. Choosing a variant jumps to its own photo when one is linked to it.
+
+### Social section (2026-11-17)
+
+`components/store/SocialSection.js`: rounded gradient card (lotus-50 → ivory → marigold-100). Left: @handle chip (from `instagram_url`), "Follow our journey", "2.7K+ followers" (static text, update by hand), Instagram gradient button + white Facebook button. Right: 3×2 tilted mosaic of real product photos (new arrivals/featured/best sellers), each linking to Instagram, IG icon on hover. Store setting `instagram_url` = https://www.instagram.com/nakshazz_/. Brand icons shared in `SocialIcons.js` (also used by the footer).
+- **Kingfisher** (মাছরাঙা, teal back / saffron belly) perches facing right near the right end of the hero branch (SVG inside the branch, so it scales with it) and turns its head now and then. On scroll past 60px, a copy takes off in a fixed layer above the header (`FlyingBird`, starting at the perched position): hop, wings flapping fast, swoops toward the viewer growing to ~8x and leaves to the right (`bird-escape`, 2.6s). Back at the top it lands again (`bird-landing`). Reduced motion: no flight. Keyframes are top-level in `globals.css`.
+
+### Responsive pass (2026-11-17)
+
+Checked at 360 / 768 / 1024 / 1440 px (no horizontal scroll at any width):
+- Header menu: 11px + tighter tracking from 1024px, full size from 1280px, `whitespace-nowrap` (one line at 1024). Below 1024 the menu lives in the drawer.
+- Categories: circles 96 / 112 / 144px; row is centred when it fits and scrolls from the first item when it does not (`first:ml-auto last:mr-auto`, avoids the justify-center clipping bug).
+- Product grids: 2 columns on phones, 4 from 768px.
+- Section spacing: 32px top/bottom on phones, 40px from 1024px (owner: consistent 40px on laptop); headings 24/32px below.
+- Reviews: swipe cards (85% / 46% width) below 1024px, 3 columns above.
+- Falling petals: from 640px only (on phones they crossed the headings).
+- **Section titles** (`HighlightTitle.js`, used by `SectionHeading`, Our Story, reviews and social): one part in an italic lotus → saffron gradient ("Shop by *Category*"). Mark the part with `*asterisks*` in the dictionary, otherwise the last word is used. On navy (`tone="dark"`) the gradient runs gold → saffron → lotus. Bangla titles get the gradient without italics (global rule).
+- **Product sections**: title only (taglines removed at owner request); "View all" sits centred below the grid as an outline pill (`ViewAllButton.js`) whose navy fill sweeps in from the left on hover (text turns white, arrow nudges right).
+
+### Bag drawer (2026-11-18)
+
+`components/store/CartDrawer.js`, mounted once in the store layout; opened by the header bag icon (`openCartDrawer()` event; the icon is still an `<a href="/cart">` fallback) and automatically after "Add to bag" in quick view. Native `<dialog>` sliding in from the right (`drawer-in`). Lines are re-priced by `POST /cart/validate` on every change (250ms debounce): server prices, line totals, subtotal, variant title, photo; problems shown per line (unavailable / sold out / only N left; the bag quantity is lowered automatically). Checkout button is disabled while any line has a problem. Delivery charge note (added at checkout). EN/BN text in `dictionaries/*.json` → `cart`.
+
+Backend: public guest POST endpoints (cart/validate, coupons/apply, checkout, orders/track, product reviews, contact) are excluded from CSRF in `bootstrap/app.php`. `statefulApi()` otherwise demands a CSRF token from the storefront origin (419). They carry no login cookie and are rate limited.

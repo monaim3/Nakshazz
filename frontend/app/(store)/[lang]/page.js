@@ -4,7 +4,10 @@ import { Star } from "lucide-react";
 import FallingPetals from "@/components/store/FallingPetals";
 import Hero3D from "@/components/store/Hero3D";
 import ProductCard from "@/components/store/ProductCard";
+import HighlightTitle from "@/components/store/HighlightTitle";
 import SectionHeading from "@/components/store/SectionHeading";
+import ViewAllButton from "@/components/store/ViewAllButton";
+import SocialSection from "@/components/store/SocialSection";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { getHome, getSettings } from "@/lib/storefront-api";
 import { localePath } from "@/lib/i18n";
@@ -37,13 +40,13 @@ export default async function HomePage() {
       {home.categories.length > 0 && (
         <section className="relative overflow-hidden">
           <FallingPetals />
-          <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
+          <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
             <SectionHeading title={t.categories} />
-            <ul className="scrollbar-none -mx-4 flex snap-x gap-6 overflow-x-auto px-4 sm:justify-center sm:gap-10">
+            <ul className="scrollbar-none -mx-4 flex snap-x gap-5 overflow-x-auto px-4 sm:gap-6 lg:gap-10 [&>li:first-child]:ml-auto [&>li:last-child]:mr-auto">
               {home.categories.map((category) => (
                 <li
                   key={category.id}
-                  className="w-28 shrink-0 snap-start sm:w-36"
+                  className="w-24 shrink-0 snap-start sm:w-28 lg:w-36"
                 >
                   <Link
                     href={localePath(lang, `/category/${category.slug}`)}
@@ -77,7 +80,6 @@ export default async function HomePage() {
 
       <ProductSection
         title={t.featured}
-        subtitle={t.featuredSubtitle}
         products={home.featured}
         lang={lang}
         dict={dict}
@@ -87,7 +89,7 @@ export default async function HomePage() {
       />
 
       {home.promo_banners.length > 0 && (
-        <section className="mx-auto grid max-w-7xl gap-4 px-4 py-12 sm:px-6 md:grid-cols-2">
+        <section className="mx-auto grid max-w-7xl gap-4 px-4 py-8 lg:py-10 sm:px-6 md:grid-cols-2">
           {home.promo_banners.slice(0, 2).map((banner) => (
             <Link
               key={banner.id}
@@ -124,7 +126,6 @@ export default async function HomePage() {
 
       <ProductSection
         title={t.newArrivals}
-        subtitle={t.newArrivalsSubtitle}
         products={home.new_arrivals}
         lang={lang}
         dict={dict}
@@ -134,7 +135,7 @@ export default async function HomePage() {
 
       <section className="relative overflow-hidden bg-[linear-gradient(160deg,var(--color-teal-100),var(--color-ivory-100)_70%)]">
         <FallingPetals />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-12 sm:px-6 md:grid-cols-2 lg:py-16">
+        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-8 sm:px-6 md:grid-cols-2 lg:py-10">
           <div className="relative mx-auto w-full max-w-md">
             <div
               className="absolute inset-6 rounded-full bg-marigold-200/50 blur-3xl"
@@ -152,7 +153,7 @@ export default async function HomePage() {
               {t.storyEyebrow}
             </p>
             <h2 className="mt-3 font-display text-4xl leading-tight text-navy-900 sm:text-5xl">
-              {t.storyTitle}
+              <HighlightTitle text={t.storyTitle} />
             </h2>
             <div className="folk-rule mx-auto my-6 w-32 md:mx-0" />
             <p className="leading-relaxed text-ink/75">{t.storyText}</p>
@@ -168,7 +169,6 @@ export default async function HomePage() {
 
       <ProductSection
         title={t.bestSellers}
-        subtitle={t.bestSellersSubtitle}
         products={home.best_sellers}
         lang={lang}
         dict={dict}
@@ -178,73 +178,58 @@ export default async function HomePage() {
 
       {home.reviews.length > 0 && (
         <section className="bg-navy-900 text-ivory-50">
-          <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
-            <div className="mb-12 text-center">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+            <div className="mb-8 text-center">
               <h2 className="font-display text-3xl text-marigold-200 sm:text-4xl">
-                {t.reviews}
+                <HighlightTitle text={t.reviews} tone="dark" />
               </h2>
               <div className="folk-rule mx-auto mt-4 w-24" />
             </div>
-            <ul className="grid gap-6 md:grid-cols-3">
-              {home.reviews.slice(0, 3).map((review) => (
-                <li
-                  key={review.id}
-                  className="rounded-sm border border-white/10 bg-white/[0.03] p-8 text-center"
-                >
-                  <div
-                    className="flex justify-center gap-1"
-                    aria-label={`${review.rating} out of 5`}
-                  >
-                    {Array.from({ length: 5 }, (_, star) => (
-                      <Star
-                        key={star}
-                        className={`size-4 ${star < review.rating ? "fill-marigold-400 text-marigold-400" : "text-white/20"}`}
-                        aria-hidden
-                      />
-                    ))}
-                  </div>
-                  <blockquote className="mt-5 font-display text-xl leading-relaxed text-ivory-50 italic">
-                    “{review.comment}”
-                  </blockquote>
-                  <p className="mt-5 text-xs tracking-[0.25em] text-marigold-300 uppercase">
-                    {review.customer_name}
-                  </p>
-                </li>
-              ))}
+            <ul className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
+              {home.reviews.map((review) => {
+                // Bangla text: no italics (breaks conjuncts) and a Bangla-capable font
+                const bangla = /[ঀ-৿]/.test(review.comment);
+                return (
+                  <li key={review.id} className="flex w-[85%] shrink-0 snap-center flex-col sm:w-[46%] rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm transition hover:border-gold-light/30 hover:bg-white/[0.06] lg:w-auto">
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1" aria-label={`${review.rating} / 5`}>
+                        {Array.from({ length: 5 }, (_, star) => (
+                          <Star key={star} className={`size-4 ${star < review.rating ? "fill-marigold-400 text-marigold-400" : "text-white/20"}`} aria-hidden />
+                        ))}
+                      </div>
+                      <span className="font-display text-5xl leading-none text-gold-light/25" aria-hidden>
+                        &rdquo;
+                      </span>
+                    </div>
+                    <blockquote lang={bangla ? "bn" : undefined} className={`mt-3 flex-1 leading-relaxed text-ivory-50 ${bangla ? "font-bangla text-[17px]" : "font-display text-xl italic"}`}>
+                      {review.comment}
+                    </blockquote>
+                    <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
+                      <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-gold-light),var(--color-saffron))] font-display text-lg text-navy-950">
+                        {review.customer_name.charAt(0)}
+                      </span>
+                      <span>
+                        <span className="block text-sm font-medium text-white">{review.customer_name}</span>
+                        {review.source === "facebook" && <span className="block text-xs text-white/50">{t.reviewsSource}</span>}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
+            {store.facebook_url && (
+              <p className="mt-10 text-center">
+                <a href={`${store.facebook_url.replace(/\/$/, "")}/reviews`} target="_blank" rel="noreferrer" className="text-sm text-gold-light underline-offset-4 hover:underline">
+                  {t.reviewsAll} →
+                </a>
+              </p>
+            )}
           </div>
         </section>
       )}
 
       {(store.facebook_url || store.instagram_url) && (
-        <section className="mx-auto max-w-3xl px-4 py-12 text-center lg:py-16 sm:px-6">
-          <h2 className="font-display text-3xl text-navy-900 sm:text-4xl">
-            {t.social}
-          </h2>
-          <p className="mt-3 text-ink/65">{t.socialText}</p>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {store.facebook_url && (
-              <a
-                href={store.facebook_url}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full border border-navy-900 px-8 py-3 text-xs font-medium tracking-[0.25em] text-navy-900 uppercase transition-colors hover:bg-navy-900 hover:text-white"
-              >
-                Facebook
-              </a>
-            )}
-            {store.instagram_url && (
-              <a
-                href={store.instagram_url}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-full border border-navy-900 px-8 py-3 text-xs font-medium tracking-[0.25em] text-navy-900 uppercase transition-colors hover:bg-navy-900 hover:text-white"
-              >
-                Instagram
-              </a>
-            )}
-          </div>
-        </section>
+        <SocialSection store={store} products={[...home.new_arrivals, ...home.featured, ...home.best_sellers].filter((product, index, all) => all.findIndex((p) => p.id === product.id) === index)} t={t} lang={lang} />
       )}
     </>
   );
@@ -252,7 +237,6 @@ export default async function HomePage() {
 
 function ProductSection({
   title,
-  subtitle,
   products,
   lang,
   dict,
@@ -264,14 +248,9 @@ function ProductSection({
 
   return (
     <section className={tone === "band" ? "bg-white/60" : undefined}>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
-        <SectionHeading
-          title={title}
-          subtitle={subtitle}
-          href={href}
-          linkLabel={linkLabel}
-        />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+        <SectionHeading title={title} />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-5 md:grid-cols-4 lg:gap-x-6">
           {products.slice(0, 8).map((product) => (
             <ProductCard
               key={product.id}
@@ -281,6 +260,7 @@ function ProductSection({
             />
           ))}
         </div>
+        {href && <ViewAllButton href={href}>{linkLabel}</ViewAllButton>}
       </div>
     </section>
   );

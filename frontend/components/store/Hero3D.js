@@ -22,6 +22,39 @@ const SCENE_MS = 6000; // auto-advance forever
 
 export default function Hero3D({ t, lang }) {
   const [step, setStep] = useState(0);
+  // Kingfisher on the branch: "perched" -> "away" when the page scrolls (a full-screen
+  // flight plays above everything, starting where the bird sat), "landing" back at the top.
+  const [bird, setBird] = useState("perched");
+  const [flight, setFlight] = useState(null);
+
+  useEffect(() => {
+    let state = "perched";
+    let landingTimer;
+    const set = (next) => {
+      state = next;
+      setBird(next);
+    };
+    const onScroll = () => {
+      const scrolled = window.scrollY > 60;
+      if (scrolled && state !== "away") {
+        const box = document.querySelector("[data-perched-bird]")?.getBoundingClientRect();
+        if (state === "perched" && box?.width && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          setFlight({ left: box.left, top: box.top, width: box.width, height: box.height, id: Date.now() });
+        }
+        clearTimeout(landingTimer);
+        set("away");
+      } else if (!scrolled && state === "away") {
+        set("landing");
+        landingTimer = setTimeout(() => set("perched"), 1700);
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(landingTimer);
+    };
+  }, []);
+
   const active = step % BRANCH_PIECES.length;
   const piece = BRANCH_PIECES[active];
 
@@ -41,7 +74,8 @@ export default function Hero3D({ t, lang }) {
     >
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_45%,#24406b_0%,#142342_45%,#0a1226_100%)]" aria-hidden />
 
-      <BranchScene key={step} piece={piece} />
+      <BranchScene key={step} piece={piece} bird={bird} />
+      {flight && <FlyingBird key={flight.id} box={flight} onDone={() => setFlight(null)} />}
 
       {/* Minimal call to action */}
       <div className="absolute inset-x-0 bottom-7 flex flex-col items-center gap-4 lg:bottom-8">
@@ -75,7 +109,7 @@ export default function Hero3D({ t, lang }) {
 
 /* ---------- Earrings land on a branch ---------- */
 
-function BranchScene({ piece }) {
+function BranchScene({ piece, bird }) {
   return (
     // The branch line runs along the top edge of this wrapper; the earrings hang from it.
     <div className="absolute inset-x-0 [--bw:130vw] sm:[--bw:84vw] lg:[--bw:70vw]" style={{ top: "var(--top)" }}>
@@ -128,12 +162,69 @@ function BranchScene({ piece }) {
         <Leaf x={365} y={79} r={-14} s={0.8} delay={0} />
         <Leaf x={346} y={86} r={-168} s={0.7} dark delay={0.6} />
         <Leaf x={902} y={84} r={-10} s={0.62} delay={0.4} />
+        <Kingfisher x={790} y={100} state={bird} />
         <Leaf x={884} y={89} r={-172} s={0.55} dark delay={1} />
         <Leaf x={60} y={132} r={115} s={0.85} delay={0.7} />
         <Leaf x={120} y={122} r={78} s={0.9} dark delay={1.4} />
         <Leaf x={250} y={182} r={62} s={0.8} delay={0.3} />
         <Leaf x={236} y={168} r={150} s={0.68} dark delay={0.9} />
         <Leaf x={430} y={112} r={95} s={0.6} delay={1.1} />
+      </svg>
+    </div>
+  );
+}
+
+/** Kingfisher drawing in logo colours, drawn facing left with its feet at (0, 0). */
+function BirdShape({ flying }) {
+  return (
+    <>
+      <path d="M14 -12 L34 -4 L30 0 L12 -7 Z" fill="#1d6f7e" />
+      {!flying && <path d="M-2 -6 L-3 0 M3 -6 L3 0" stroke="#d9772a" strokeWidth="1.6" strokeLinecap="round" />}
+      <ellipse cx="2" cy="-15" rx="15" ry="11" fill="var(--color-teal-500)" />
+      <path d="M-12 -14 C -10 -4, 8 -2, 14 -10 C 6 -8, -4 -10, -12 -14 Z" fill="var(--color-saffron)" />
+      <g className={flying ? "bird-wing-flap" : "bird-wing"} style={{ transformOrigin: "-2px -20px" }}>
+        <path d="M-2 -21 C 8 -26, 20 -22, 24 -12 C 14 -12, 4 -14, -2 -21 Z" fill="#1d6f7e" />
+        <path d="M3 -20 C 10 -21, 16 -18, 19 -14" stroke="#7fd3d8" strokeWidth="1.2" fill="none" />
+      </g>
+      <g className={flying ? undefined : "bird-head"} style={{ transformOrigin: "-10px -24px" }}>
+        <circle cx="-11" cy="-27" r="8.5" fill="var(--color-teal-500)" />
+        <path d="M-18 -24 C -14 -21, -9 -21, -5 -23 C -8 -19, -15 -19, -18 -24 Z" fill="var(--color-saffron)" />
+        <circle cx="-14" cy="-29" r="1.8" fill="#0a1226" />
+        <circle cx="-14.5" cy="-29.6" r="0.6" fill="white" />
+        <path d="M-19 -28 L-36 -24.5 L-19 -24.5 Z" fill="#1f1f24" />
+      </g>
+    </>
+  );
+}
+
+/** Perched kingfisher on the branch, facing right (mirrored). */
+function Kingfisher({ x, y, state }) {
+  return (
+    <g transform={`translate(${x} ${y}) scale(-1.3 1.3)`}>
+      <g className={`bird bird-${state}`} data-perched-bird>
+        <BirdShape flying={state === "landing"} />
+      </g>
+    </g>
+  );
+}
+
+/**
+ * Take-off: a copy of the bird in a fixed layer above the page (so the header and the
+ * hero's edges never clip it). It hops, flaps, swoops toward the viewer growing large,
+ * and leaves across the screen to the right.
+ */
+function FlyingBird({ box, onDone }) {
+  return (
+    <div
+      className="pointer-events-none fixed z-[60] animate-[bird-escape_2.6s_cubic-bezier(.45,.05,.35,1)_forwards] will-change-transform"
+      style={{ left: box.left, top: box.top, width: box.width, height: box.height }}
+      onAnimationEnd={(event) => event.target === event.currentTarget && onDone()}
+      aria-hidden
+    >
+      <svg viewBox="-37 -37 72 38" className="size-full overflow-visible">
+        <g transform="scale(-1 1)">
+          <BirdShape flying />
+        </g>
       </svg>
     </div>
   );

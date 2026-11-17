@@ -22,7 +22,7 @@ const PETALS = [
 
 export default function FallingPetals() {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden motion-reduce:hidden" aria-hidden>
+    <div className="pointer-events-none absolute inset-0 hidden overflow-hidden motion-reduce:hidden sm:block" aria-hidden>
       {PETALS.map(([left, size, duration, delay], index) => (
         // The column is as tall as the section, so translateY(%) moves the petal through its full height.
         <div key={index} className="absolute inset-y-0 animate-[petal-fall_linear_infinite]" style={{ left: `${left}%`, animationDuration: `${duration}s`, animationDelay: `${delay}s` }}>

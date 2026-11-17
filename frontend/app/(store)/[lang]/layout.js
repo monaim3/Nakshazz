@@ -1,6 +1,8 @@
 import { Cormorant_Garamond, Hind_Siliguri, Jost, Pinyon_Script } from "next/font/google";
 import Header from "@/components/store/Header";
 import Footer from "@/components/store/Footer";
+import WhatsAppButton from "@/components/store/WhatsAppButton";
+import CartDrawer from "@/components/store/CartDrawer";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { getCategories, getSettings } from "@/lib/storefront-api";
 import { LOCALES } from "@/lib/i18n";
@@ -48,6 +50,8 @@ export default async function StoreLayout({ children }) {
         <Header lang={lang} dict={dict} categories={categories} />
         <main id="main">{children}</main>
         <Footer lang={lang} dict={dict} store={store} categories={categories} />
+        <CartDrawer lang={lang} t={dict.cart} />
+        <WhatsAppButton number={store.whatsapp_number} label={dict.nav.whatsapp} greeting={dict.nav.whatsappGreeting} />
       </body>
     </html>
   );

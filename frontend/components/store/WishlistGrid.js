@@ -29,7 +29,7 @@ export default function WishlistGrid({ lang, dict }) {
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-6 lg:grid-cols-4">
+    <ul className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-5 md:grid-cols-4 lg:gap-x-6">
       {items.map((product) => {
         const href = localePath(lang, `/product/${product.slug}`);
         return (

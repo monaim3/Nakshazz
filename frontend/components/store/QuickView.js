@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, Minus, Plus, ShoppingBag, X } from "lucide-react";
-import { addToCart } from "@/lib/cart-storage";
+import { addToCart, openCartDrawer } from "@/lib/cart-storage";
 import { localePath, localizeDigits } from "@/lib/i18n";
 import FavouriteButton from "./FavouriteButton";
 import Price from "./Price";
@@ -74,6 +74,11 @@ export default function QuickView({ slug, open, onClose, lang, t }) {
   function handleAdd() {
     if (!variant || soldOut) return;
     addToCart(variant.id, quantity, max);
+    // show the bag right away (popular pattern); the quick view closes behind it
+    setTimeout(() => {
+      onClose();
+      openCartDrawer();
+    }, 500);
     setAdded(true);
     setTimeout(() => setAdded(false), 2200);
   }

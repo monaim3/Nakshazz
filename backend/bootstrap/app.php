@@ -23,6 +23,16 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Admin SPA authenticates with Sanctum session cookies + CSRF.
         $middleware->statefulApi();
+        // Public guest endpoints use no login cookie, so CSRF protects nothing there; they are
+        // rate limited instead. Without this, requests from the storefront origin get 419.
+        $middleware->validateCsrfTokens(except: [
+            'api/v1/cart/validate',
+            'api/v1/coupons/apply',
+            'api/v1/checkout',
+            'api/v1/orders/track',
+            'api/v1/products/*/reviews',
+            'api/v1/contact',
+        ]);
         $middleware->alias(['active' => EnsureUserIsActive::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

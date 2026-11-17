@@ -4,24 +4,7 @@ import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { localePath } from "@/lib/i18n";
 import badge from "@/public/brand/logo-badge-600.png";
-
-function FacebookIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden {...props}>
-      <path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.6V4.4c-.3 0-1.2-.1-2.3-.1-2.3 0-3.8 1.4-3.8 3.9v2.3H8v3h2.5V21h3z" />
-    </svg>
-  );
-}
-
-function InstagramIcon(props) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden {...props}>
-      <rect x="3.5" y="3.5" width="17" height="17" rx="4.5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="17.3" cy="6.7" r="0.9" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
+import { FacebookIcon, InstagramIcon } from "./SocialIcons";
 
 /** Year for the copyright line; cached so the footer stays part of the static page. */
 async function currentYear() {
@@ -80,7 +63,7 @@ export default async function Footer({ lang, dict, store, categories }) {
 
         <FooterColumn title={dict.footer.contact}>
           {store.phone && (
-            <a href={`tel:${store.phone}`} className="flex items-center gap-2.5 hover:text-marigold-300">
+            <a href={`tel:${String(store.phone).replace(/[^+\d]/g, "")}`} className="flex items-center gap-2.5 hover:text-marigold-300">
               <Phone className="size-4 text-marigold-400" strokeWidth={1.5} /> {store.phone}
             </a>
           )}

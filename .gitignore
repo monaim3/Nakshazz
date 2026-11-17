@@ -1,0 +1,17 @@
+# Owner's original photos (large, private) and local browser-test output
+photos/
+.playwright-mcp/
+
+# Dependencies and builds (also ignored per app)
+node_modules/
+vendor/
+.next/
+
+# Secrets: never commit real env files
+.env
+.env.local
+.env.*.local
+
+# OS / editor
+.DS_Store
+Thumbs.db

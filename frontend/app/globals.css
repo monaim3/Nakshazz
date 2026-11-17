@@ -1,0 +1,210 @@
+@import "tailwindcss";
+
+/*
+  Nakshazz design tokens.
+  Storefront: warm cream, ivory, beige, subtle gold, warm charcoal ink.
+  Admin: same palette, quieter — readability first.
+*/
+@theme {
+  --color-cream-50: #fdfbf7;
+  --color-cream-100: #faf6f0;
+  --color-cream-200: #f3ebdf;
+  --color-cream-300: #e9dccb;
+  --color-sand-400: #d6c3a8;
+  --color-sand-500: #bfa685;
+
+  --color-gold-300: #dcc391;
+  --color-gold-400: #c9a96e;
+  --color-gold-500: #b08d57;
+  --color-gold-600: #8f7044;
+  --color-gold-700: #6f5634;
+
+  --color-ink-50: #f6f5f4;
+  --color-ink-100: #e9e6e3;
+  --color-ink-200: #d3cdc7;
+  --color-ink-300: #b1a9a1;
+  --color-ink-400: #8a8078;
+  --color-ink-500: #6b625b;
+  --color-ink-600: #534b45;
+  --color-ink-700: #3f3934;
+  --color-ink-800: #2d2925;
+  --color-ink-900: #1f1c19;
+
+  /*
+    Storefront palette — taken from the নকসাজ logo (see docs/05-storefront.md):
+    navy frame (primary, text), lotus magenta (calls to action), marigold/saffron
+    lettering (gold accent), peacock teal (small details). Warm ivory backgrounds
+    keep jewellery photos clean.
+  */
+  --color-ivory-50: #fffcf6;
+  --color-ivory-100: #fbf5ea;
+  --color-ivory-200: #f4ead8;
+  --color-ivory-300: #e9dabd;
+
+  --color-navy-100: #e4e8f1;
+  --color-navy-300: #8d9abb;
+  --color-navy-500: #3a4f7e;
+  --color-navy-700: #1c2d55;
+  --color-navy-800: #142342;
+  --color-navy-900: #0f1b35;
+  --color-navy-950: #0a1226;
+
+  --color-lotus-50: #fdf0f4;
+  --color-lotus-100: #fbdce7;
+  --color-lotus-200: #f6b4cb;
+  --color-lotus-400: #e4497d;
+  --color-lotus-500: #d11e58;
+  --color-lotus-600: #b3164a;
+  --color-lotus-700: #8e103a;
+
+  --color-marigold-100: #fdf3d6;
+  --color-marigold-200: #f9e3a0;
+  --color-marigold-300: #f3cd5f;
+  --color-marigold-400: #ebbd33;
+  --color-marigold-500: #e9a02e;
+  --color-marigold-600: #c27a12;
+  --color-marigold-700: #8f580b;
+
+  --color-teal-100: #dcf1ee;
+  --color-teal-400: #40a796;
+  --color-teal-500: #238a9b;
+
+  /* The two golds of the logo lettering (নকসাজ) and its maroon 3D shadow */
+  --color-gold-light: #f2cc5e;
+  --color-saffron: #e5932a;
+  --color-maroon: #3d1f29;
+
+  --color-ink: #17203a;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), var(--font-hind), ui-serif, Georgia, serif;
+  --font-script: var(--font-pinyon), var(--font-hind), "Brush Script MT", cursive;
+  --font-body: var(--font-jost), var(--font-hind), ui-sans-serif, system-ui, sans-serif;
+  --font-bangla: var(--font-hind), var(--font-jost), sans-serif;
+
+  --radius-card: 0.875rem;
+
+  --animate-fade-in: fade-in 180ms ease-out;
+  /* Homepage hero (components/store/Hero3D.js) */
+  @keyframes hero-branch-in {
+    from { transform: translateX(-105%) rotate(-4deg); opacity: 0; }
+    to { transform: translateX(0) rotate(0); opacity: 1; }
+  }
+  @keyframes hero-hang-in {
+    0% { transform: translateX(70vw) translateY(-30px) rotate(16deg); opacity: 0; }
+    15% { opacity: 1; }
+    55% { transform: translateX(-1.5vw) translateY(0) rotate(-7deg); }
+    70% { transform: translateX(0) rotate(4deg); }
+    82% { transform: rotate(-2deg); }
+    92% { transform: rotate(1deg); }
+    100% { transform: translateX(0) rotate(0); opacity: 1; }
+  }
+  @keyframes hero-sway {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(1.4deg); }
+  }
+  @keyframes hero-leaf {
+    0%, 100% { transform: rotate(0); }
+    50% { transform: rotate(6deg); }
+  }
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-cream-50 text-ink-800 font-sans antialiased;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-gold-500;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/*
+  Bengali script joins letters into conjuncts; letter-spacing and italics break them.
+  On Bangla pages remove tracking/italic everywhere except the Latin wordmark (.keep-tracking).
+*/
+html[lang="bn"] [class*="tracking-"]:not(.keep-tracking) {
+  letter-spacing: normal;
+}
+
+html[lang="bn"] .italic {
+  font-style: normal;
+}
+
+/* Dotted folk-art rule, echoing the marigold dots on the logo's magenta frame. */
+@utility folk-rule {
+  height: 6px;
+  background-image: radial-gradient(circle, var(--color-marigold-400) 1.5px, transparent 1.8px);
+  background-size: 14px 6px;
+  background-position: center;
+  background-repeat: repeat-x;
+}
+
+/* Signature gradient: lotus → saffron → marigold, the logo's lotus and lettering. */
+@utility bg-brand-gradient {
+  background-image: linear-gradient(100deg, var(--color-lotus-500) 0%, var(--color-marigold-500) 60%, var(--color-marigold-400) 100%);
+}
+
+@utility text-brand-gradient {
+  background-image: linear-gradient(100deg, var(--color-lotus-500) 0%, var(--color-marigold-500) 70%, var(--color-marigold-400) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Logo lettering: light gold top half, saffron bottom half (hard split). */
+@utility bg-logo-gold {
+  background-image: linear-gradient(180deg, var(--color-gold-light) 0 52%, var(--color-saffron) 52% 100%);
+}
+
+@utility text-logo-gold {
+  background-image: linear-gradient(180deg, var(--color-gold-light) 0 54%, var(--color-saffron) 54% 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* stacked hard shadows = the logo's maroon extrusion */
+  filter: drop-shadow(2px 2px 0 var(--color-maroon)) drop-shadow(2px 2px 0 var(--color-maroon)) drop-shadow(3px 3px 0 var(--color-maroon)) drop-shadow(0 18px 30px rgb(5 10 25 / 0.6));
+}
+
+/* Thin strip of the logo's frame colours: navy, lotus, teal, marigold. */
+@utility brand-strip {
+  height: 3px;
+  background-image: linear-gradient(90deg, var(--color-lotus-500), var(--color-marigold-400) 35%, var(--color-teal-400) 65%, var(--color-lotus-500));
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+}
+
+/* Falling petals on section sides (components/store/FallingPetals.js) (defined outside @theme so Tailwind always emits them) */
+@keyframes petal-fall {
+  from { transform: translateY(-12%); }
+  to { transform: translateY(105%); }
+}
+@keyframes petal-sway {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  50% { transform: translateX(22px) rotate(200deg); }
+}

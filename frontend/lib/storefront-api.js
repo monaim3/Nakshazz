@@ -48,3 +48,36 @@ export async function getPage(slug) {
   cacheTag(`page:${slug}`);
   return apiGet(`/pages/${encodeURIComponent(slug)}`);
 }
+
+/** Full paginated response ({ data, meta }) for the listing endpoints. */
+async function apiGetPage(path) {
+  const response = await fetch(`${API_URL}${path}`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`API ${response.status} for ${path}`);
+  return response.json();
+}
+
+/**
+ * Product listing (shop, category pages). `query` keys: q, category, sort, min_price,
+ * max_price, in_stock, featured, page, per_page. Cached per distinct query.
+ */
+export async function getProducts(query = {}) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("products");
+  const params = new URLSearchParams(Object.entries(query).filter(([, value]) => value !== undefined && value !== null && value !== ""));
+  return apiGetPage(`/products?${params}`);
+}
+
+export async function getCategory(slug) {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("categories");
+  return apiGet(`/categories/${encodeURIComponent(slug)}`);
+}
+
+export async function getProductReviews(slug) {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("reviews", `product:${slug}`);
+  return (await apiGet(`/products/${encodeURIComponent(slug)}/reviews`)) || [];
+}

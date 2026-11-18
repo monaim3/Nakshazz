@@ -72,7 +72,8 @@
     "addFavourite": "Add to favourites",
     "removeFavourite": "Remove from favourites",
     "close": "Close",
-    "loadError": "Sorry, this product could not be loaded. Please try again."
+    "loadError": "Sorry, this product could not be loaded. Please try again.",
+    "buyNow": "Buy now"
   },
   "footer": {
     "shop": "Shop",
@@ -109,5 +110,57 @@
     "limitedStock": "Only :count available, quantity adjusted.",
     "fixProblems": "Please fix the items marked above to continue.",
     "loadError": "Could not refresh prices. Check your connection."
+  },
+  "shop": {
+    "title": "Shop all *jewellery*",
+    "intro": "Every piece is handmade in small batches in Dhaka — earrings, chandbalis, clay and resin jewellery and necklaces.",
+    "metaTitle": "Shop handmade jewellery",
+    "metaDescription": "Shop handmade earrings, chandbali, jhumka, clay and resin jewellery and necklaces from Nakshazz, Dhaka. Cash on delivery all over Bangladesh.",
+    "home": "Home",
+    "breadcrumb": "Breadcrumb",
+    "all": "All",
+    "search": "Search",
+    "searchPlaceholder": "Search jewellery…",
+    "price": "Price (৳)",
+    "min": "Min",
+    "max": "Max",
+    "go": "Go",
+    "inStockOnly": "In stock only",
+    "clearFilters": "Clear filters",
+    "filters": "Filters",
+    "close": "Close",
+    "sortBy": "Sort by",
+    "results": ":count pieces",
+    "sorts": {
+      "newest": "Newest",
+      "popular": "Best selling",
+      "price": "Price: low to high",
+      "-price": "Price: high to low",
+      "name": "Name A–Z"
+    },
+    "empty": "Nothing found",
+    "emptyText": "Try another search or clear the filters.",
+    "viewEverything": "View all jewellery",
+    "pagination": "Pages",
+    "previous": "Previous page",
+    "next": "Next page",
+    "loadError": "Could not load products. Please refresh the page."
+  },
+  "productPage": {
+    "reviewsCount": ":count reviews",
+    "delivery": "Delivery all over Bangladesh in 2–5 days",
+    "payment": "Cash on delivery or bKash — pay when it reaches you",
+    "handmade": "Handmade in Dhaka — each piece is slightly unique",
+    "madeIn": "Made for you in about :days days",
+    "description": "Description",
+    "careTitle": "Care",
+    "care": [
+      "Keep away from water, perfume and sweat.",
+      "Store each piece in its pouch or a dry box.",
+      "Wipe gently with a soft dry cloth after wearing."
+    ],
+    "reviewsTitle": "Customer *reviews*",
+    "noReviews": "No reviews yet — be the first to share yours.",
+    "relatedTitle": "You may also *like*"
   }
 }

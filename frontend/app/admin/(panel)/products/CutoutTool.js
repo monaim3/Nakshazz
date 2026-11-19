@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Eraser, ImageUp, RotateCcw, Wand2 } from "lucide-react";
+import { Crop, Eraser, ImageUp, RotateCcw, Wand2 } from "lucide-react";
 import { alphaBounds, findPieces, foregroundMask } from "@/lib/cutout";
 import { Button, Modal, Spinner } from "@/components/admin/ui";
 
@@ -23,6 +23,9 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
   const [pieceCount, setPieceCount] = useState(0);
   const [brush, setBrush] = useState(18);
   const painting = useRef(false);
+  const [tool, setTool] = useState("erase"); // erase | area
+  const [box, setBox] = useState(null); // keep-area rectangle while dragging, in % of the canvas
+  const boxStart = useRef(null);
 
   // final alpha for every pixel = model mask x chosen piece x not erased
   const alphaAt = useCallback(
@@ -100,6 +103,26 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
     render(pieceIndex);
   }
 
+  const pointAt = (event) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)), y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)) };
+  };
+
+  /** Keep only what is inside the dragged rectangle. */
+  function keepArea(a, b) {
+    const { w, h, erased } = state.current;
+    const x0 = Math.round(Math.min(a.x, b.x) * w);
+    const x1 = Math.round(Math.max(a.x, b.x) * w);
+    const y0 = Math.round(Math.min(a.y, b.y) * h);
+    const y1 = Math.round(Math.max(a.y, b.y) * h);
+    if (x1 - x0 < 8 || y1 - y0 < 8) return; // a click, not a drag
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) if (x < x0 || x > x1 || y < y0 || y > y1) erased[y * w + x] = 1;
+    }
+    setPieceIndex(-1); // the box is the selection now
+    render(-1);
+  }
+
   function finish() {
     const { w, h, rgba } = state.current;
     const alpha = alphaAt(pieceIndex);
@@ -141,18 +164,39 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
 
         <div className={stage === "edit" ? "space-y-4" : "hidden"}>
           <div className="flex max-h-[55vh] justify-center overflow-hidden rounded-xl bg-[conic-gradient(#e5e5e5_25%,#fff_0_50%,#e5e5e5_0_75%,#fff_0)] bg-[length:18px_18px] ring-1 ring-ink-100">
+            <div className="relative">
             <canvas
               ref={canvasRef}
               className="max-h-[55vh] max-w-full cursor-crosshair touch-none object-contain"
               onPointerDown={(event) => {
                 painting.current = true;
                 event.currentTarget.setPointerCapture(event.pointerId);
-                erase(event);
+                if (tool === "erase") erase(event);
+                else boxStart.current = pointAt(event);
               }}
-              onPointerMove={(event) => painting.current && erase(event)}
-              onPointerUp={() => (painting.current = false)}
-              onPointerCancel={() => (painting.current = false)}
+              onPointerMove={(event) => {
+                if (!painting.current) return;
+                if (tool === "erase") erase(event);
+                else setBox({ a: boxStart.current, b: pointAt(event) });
+              }}
+              onPointerUp={(event) => {
+                if (painting.current && tool === "area" && boxStart.current) keepArea(boxStart.current, pointAt(event));
+                painting.current = false;
+                boxStart.current = null;
+                setBox(null);
+              }}
+              onPointerCancel={() => {
+                painting.current = false;
+                setBox(null);
+              }}
             />
+            {box && (
+              <div
+                className="pointer-events-none absolute border-2 border-dashed border-gold-600 bg-gold-300/15"
+                style={{ left: `${Math.min(box.a.x, box.b.x) * 100}%`, top: `${Math.min(box.a.y, box.b.y) * 100}%`, width: `${Math.abs(box.b.x - box.a.x) * 100}%`, height: `${Math.abs(box.b.y - box.a.y) * 100}%` }}
+              />
+            )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -166,7 +210,12 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
               Everything
             </Button>
             <span className="ml-auto flex items-center gap-2 text-ink-500">
-              <Eraser className="size-4" /> Eraser
+              <Button size="sm" variant={tool === "area" ? "primary" : "secondary"} onClick={() => setTool("area")} className="gap-1.5">
+                <Crop className="size-4" /> Keep area
+              </Button>
+              <Button size="sm" variant={tool === "erase" ? "primary" : "secondary"} onClick={() => setTool("erase")} className="gap-1.5">
+                <Eraser className="size-4" /> Eraser
+              </Button>
               <input type="range" min="6" max="110" value={brush} onChange={(event) => setBrush(Number(event.target.value))} aria-label="Eraser size" className="w-24 accent-ink-800" />
             </span>
             <Button
@@ -178,10 +227,10 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
               }}
               className="gap-1.5"
             >
-              <RotateCcw className="size-4" /> Undo erasing
+              <RotateCcw className="size-4" /> Reset
             </Button>
           </div>
-          <p className="text-xs text-ink-400">Drag on the picture to erase leftovers (stand, hook holder, branch). For earrings keep ONE earring; the other ear is mirrored in the shop.</p>
+          <p className="text-xs text-ink-400">For earrings keep ONE earring only (the other ear is mirrored in the shop). <strong>Keep area</strong>: drag a box around the earring you want. <strong>Eraser</strong>: rub out leftovers such as the stand or a leaf.</p>
         </div>
 
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

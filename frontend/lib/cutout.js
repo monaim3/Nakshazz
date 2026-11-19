@@ -135,6 +135,39 @@ export function findPieces(rgba, mask, w, h) {
     if (mx > 95 || (sat > 0.35 && mx > 60)) bright[p] = 1;
   }
 
+  // The outline of the cut-out carries a thin halo of the (light) background. Along a black
+  // stand that halo would read as "bright" and glue everything into one piece, so nothing
+  // on the outline counts as product evidence.
+  const inverse0 = new Uint8Array(n);
+  for (let p = 0; p < n; p++) inverse0[p] = solid[p] ? 0 : 1;
+  const edgeBand = dilate(inverse0, w, h, Math.max(4, Math.round(Math.max(w, h) / 200)));
+  for (let p = 0; p < n; p++) if (edgeBand[p]) bright[p] = 0;
+
+  // Dark jewellery (oxidised silver) on a black stand: brightness cannot tell them apart,
+  // texture can. Jewellery is full of small details; a stand is smooth. Count a pixel as
+  // product when it is well inside the cut-out (not on its outline) and the picture
+  // changes sharply around it.
+  const lum = (p) => rgba[p * 4] * 0.3 + rgba[p * 4 + 1] * 0.59 + rgba[p * 4 + 2] * 0.11;
+  const textured = new Uint8Array(n);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      if (!solid[p] || edgeBand[p]) continue;
+      if (Math.abs(lum(p + 1) - lum(p - 1)) + Math.abs(lum(p + w) - lum(p - w)) > 38) textured[p] = 1;
+    }
+  }
+  // only dense texture counts (single sparkles on a glossy stand do not)
+  const D = 3;
+  for (let y = D; y < h - D; y++) {
+    for (let x = D; x < w - D; x++) {
+      const p = y * w + x;
+      if (!textured[p] || bright[p]) continue;
+      let count = 0;
+      for (let dy = -D; dy <= D; dy++) for (let dx = -D; dx <= D; dx++) count += textured[p + dy * w + dx];
+      if (count >= 10) bright[p] = 1;
+    }
+  }
+
   // label connected groups of bright pixels (slightly dilated so filigree stays together)
   const r = Math.max(2, Math.round(Math.max(w, h) / 250));
   const grown = dilate(bright, w, h, r);
@@ -165,18 +198,62 @@ export function findPieces(rgba, mask, w, h) {
     sizes.push(size);
   }
 
-  const biggest = Math.max(...sizes);
-  return sizes
-    .map((size, id) => ({ id, size }))
+  // A stud and the drop hanging under it are joined only by a thin dark link, so they come
+  // out as separate groups. Join groups that sit one above the other (their widths overlap
+  // and the gap is small); two earrings on a stand hang side by side and stay apart.
+  const count = sizes.length;
+  const box = Array.from({ length: count }, () => [w, h, -1, -1]); // x0, y0, x1, y1
+  const leafy = new Int32Array(count); // yellow-green pixels: a leaf used as a photo prop
+  for (let p = 0; p < n; p++) {
+    const id = labels[p];
+    if (!id || !bright[p]) continue;
+    const x = p % w;
+    const y = (p - x) / w;
+    const b = box[id];
+    if (x < b[0]) b[0] = x;
+    if (y < b[1]) b[1] = y;
+    if (x > b[2]) b[2] = x;
+    if (y > b[3]) b[3] = y;
+    const red = rgba[p * 4];
+    if (rgba[p * 4 + 1] > red * 1.1 && red > rgba[p * 4 + 2] * 1.2) leafy[id]++;
+  }
+  const parent = Array.from({ length: count }, (_, i) => i);
+  const find = (i) => {
+    while (parent[i] !== i) i = parent[i] = parent[parent[i]];
+    return i;
+  };
+  const real = [];
+  for (let id = 1; id < count; id++) if (sizes[id] > 12) real.push(id);
+  const gapMax = Math.round(Math.max(w, h) / 22);
+  for (let i = 0; i < real.length; i++) {
+    for (let j = i + 1; j < real.length; j++) {
+      const a = box[real[i]];
+      const b = box[real[j]];
+      const overlap = Math.min(a[2], b[2]) - Math.max(a[0], b[0]);
+      const narrow = Math.min(a[2] - a[0], b[2] - b[0]) + 1;
+      const gap = Math.max(a[1], b[1]) - Math.min(a[3], b[3]);
+      if (overlap >= narrow * 0.5 && gap <= gapMax) parent[find(real[i])] = find(real[j]);
+    }
+  }
+  const total = new Float64Array(count);
+  const leaf = new Float64Array(count);
+  for (let id = 1; id < count; id++) {
+    total[find(id)] += sizes[id];
+    leaf[find(id)] += leafy[id];
+  }
+  for (let p = 0; p < n; p++) if (labels[p]) labels[p] = find(labels[p]);
+
+  const biggest = Math.max(...total);
+  return Array.from(total, (size, id) => ({ id, size, prop: leaf[id] > size * 0.5 }))
     .filter((piece) => piece.id > 0 && piece.size > biggest * 0.15)
-    .sort((a, b) => b.size - a.size)
+    .sort((a, b) => a.prop - b.prop || b.size - a.size) // jewellery first, leaves last
     .slice(0, 4)
     .map((piece) => {
       const own = new Uint8Array(n);
       for (let p = 0; p < n; p++) if (labels[p] === piece.id) own[p] = 1;
       // "closing" (grow, then shrink): fills the piece's own dark details (oxidised metal,
       // gaps between beads) without reaching out along the stand
-      const R = Math.max(4, Math.round(Math.max(w, h) / 70));
+      const R = Math.max(4, Math.round(Math.max(w, h) / 50));
       const grownPiece = dilate(own, w, h, R);
       const inverse = new Uint8Array(n);
       for (let p = 0; p < n; p++) inverse[p] = grownPiece[p] ? 0 : 1;

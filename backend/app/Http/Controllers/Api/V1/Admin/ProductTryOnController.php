@@ -18,7 +18,7 @@ class ProductTryOnController extends Controller
     public function store(Request $request, Product $product, ImageProcessor $images, ProductService $products): ProductResource
     {
         $request->validate([
-            'image' => ['required', 'file', 'image', 'mimes:png,webp', 'max:8192', 'dimensions:min_width=150,min_height=150,max_width=6000,max_height=6000'],
+            'image' => ['required', 'file', 'image', 'mimes:png,webp', 'max:8192', 'dimensions:min_width=40,min_height=40,max_width=6000,max_height=6000'],
         ], [
             'image.mimes' => 'Upload a PNG or WebP with a transparent background.',
         ]);

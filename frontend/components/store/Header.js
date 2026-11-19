@@ -161,9 +161,9 @@ export default function Header({ lang, dict, categories }) {
               </span>
             )}
           </Link>
-          {/* Opens the bag drawer (falls back to the /cart page without JavaScript) */}
+          {/* Opens the bag drawer (opened in a new tab or without JavaScript: the checkout page) */}
           <a
-            href={localePath(lang, "/cart")}
+            href={localePath(lang, "/checkout")}
             onClick={(event) => {
               event.preventDefault();
               openCartDrawer();

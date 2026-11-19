@@ -19,7 +19,6 @@ export default function CatalogToolbar({ query, total, facets, lang, t }) {
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState(query.q || "");
 
   function apply(changes) {
     const next = new URLSearchParams();
@@ -38,10 +37,14 @@ export default function CatalogToolbar({ query, total, facets, lang, t }) {
 
   const filters = (
     <div className="space-y-6">
+      {/* Plain GET form: the text is read from the field itself, so a search typed before
+          the page has finished loading (slow phone) or without JavaScript still works. */}
       <form
+        action={pathname}
+        method="get"
         onSubmit={(event) => {
           event.preventDefault();
-          apply({ q: search.trim() });
+          apply({ q: String(new FormData(event.currentTarget).get("q") || "").trim() });
           setOpen(false);
         }}
       >
@@ -50,7 +53,7 @@ export default function CatalogToolbar({ query, total, facets, lang, t }) {
         </label>
         <div className="mt-2 flex h-11 items-center gap-2 rounded-full border border-ivory-300 bg-white px-4 focus-within:border-navy-900">
           <Search className="size-4 text-ink/40" />
-          <input id="catalog-search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t.searchPlaceholder} maxLength={100} className="w-full bg-transparent text-sm outline-none" />
+          <input id="catalog-search" name="q" type="search" key={query.q || ""} defaultValue={query.q || ""} placeholder={t.searchPlaceholder} maxLength={100} className="w-full bg-transparent text-sm outline-none" />
         </div>
       </form>
 
@@ -102,7 +105,6 @@ export default function CatalogToolbar({ query, total, facets, lang, t }) {
         <button
           type="button"
           onClick={() => {
-            setSearch("");
             apply({ q: undefined, min_price: undefined, max_price: undefined, in_stock: undefined, on_sale: undefined, color: undefined });
             setOpen(false);
           }}

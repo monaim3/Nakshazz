@@ -27,7 +27,11 @@ class StorefrontRevalidator
 
         defer(function () use ($url, $secret, $tags): void {
             try {
-                Http::timeout(3)->withToken($secret)->post($url, ['tags' => array_values(array_unique($tags))]);
+                $response = Http::timeout(3)->withToken($secret)->post($url, ['tags' => array_values(array_unique($tags))]);
+
+                if ($response->failed()) {
+                    Log::warning('Storefront revalidation was refused', ['tags' => $tags, 'status' => $response->status()]);
+                }
             } catch (Throwable $exception) {
                 Log::warning('Storefront revalidation failed', ['tags' => $tags, 'error' => $exception->getMessage()]);
             }

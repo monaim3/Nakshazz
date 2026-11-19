@@ -101,3 +101,11 @@ export async function getFacets(category) {
   cacheTag("products");
   return apiGet(`/products/facets${category ? `?category=${encodeURIComponent(category)}` : ""}`);
 }
+
+/** Slugs + last-changed dates of every public page, for /sitemap.xml. */
+export async function getSitemap() {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("products", "categories");
+  return apiGet("/sitemap");
+}

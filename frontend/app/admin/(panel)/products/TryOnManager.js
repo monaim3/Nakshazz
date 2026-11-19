@@ -36,6 +36,7 @@ export default function TryOnManager({ product }) {
   const [remove, removeState] = useDeleteTryOnImageMutation();
   const help = SIZE_HELP[type];
   const [cutoutOpen, setCutoutOpen] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   async function save() {
     try {
@@ -90,14 +91,29 @@ export default function TryOnManager({ product }) {
         </div>
 
         <div>
-          <div className="flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-[conic-gradient(#eee_25%,#fff_0_50%,#eee_0_75%,#fff_0)] bg-[length:16px_16px] ring-1 ring-ink-100">
+          <div
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              onFile(event.dataTransfer.files?.[0]);
+            }}
+            className={`relative flex aspect-square items-center justify-center overflow-hidden rounded-xl bg-[conic-gradient(#eee_25%,#fff_0_50%,#eee_0_75%,#fff_0)] bg-[length:16px_16px] transition ${dragging ? "ring-2 ring-gold-500" : "ring-1 ring-ink-100"}`}
+          >
+            {dragging ? (
+              <span className="absolute inset-0 flex items-center justify-center bg-cream-50/90 px-4 text-center text-sm font-medium text-ink-800">Drop the PNG here</span>
+            ) : null}
             {imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element -- admin preview from API host
               <img src={imageUrl} alt="Try-on photo" className="max-h-full max-w-full object-contain p-2" />
             ) : uploadState.isLoading ? (
               <Spinner />
             ) : (
-              <span className="px-4 text-center text-xs text-ink-400">Transparent photo appears here</span>
+              <span className="px-4 text-center text-xs text-ink-400">Drag and drop a transparent PNG here</span>
             )}
           </div>
           <Button size="sm" onClick={() => setCutoutOpen(true)} className="mt-2 w-full gap-1.5">

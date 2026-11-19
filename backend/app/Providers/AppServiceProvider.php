@@ -45,7 +45,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Stops fake COD order floods: per network and per phone number.
         RateLimiter::for('checkout', fn (Request $request) => [
-            Limit::perHour(10)->by('ip:'.$request->ip()),
+            Limit::perHour(30)->by('ip:'.$request->ip()),
             Limit::perHour(5)->by('phone:'.(PhoneNumber::normalize($request->input('customer.phone')) ?? $request->ip())),
         ]);
 

@@ -7,6 +7,7 @@ import ProductCard from "@/components/store/ProductCard";
 import HighlightTitle from "@/components/store/HighlightTitle";
 import SectionHeading from "@/components/store/SectionHeading";
 import ViewAllButton from "@/components/store/ViewAllButton";
+import ReviewsCarousel from "@/components/store/ReviewsCarousel";
 import SocialSection from "@/components/store/SocialSection";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { getHome, getSettings } from "@/lib/storefront-api";
@@ -177,52 +178,31 @@ export default async function HomePage() {
       />
 
       {home.reviews.length > 0 && (
-        <section className="bg-navy-900 text-ivory-50">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
+        <section className="relative overflow-hidden bg-navy-950 text-ivory-50">
+          {/* soft lotus glow + faint grid, like a stage behind the cards */}
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_60%,rgba(209,30,88,0.28),transparent_70%)]" aria-hidden />
+          <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:44px_44px]" aria-hidden />
+          <div className="relative mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:py-16">
             <div className="mb-8 text-center">
-              <h2 className="font-display text-3xl text-marigold-200 sm:text-4xl">
+              <p className="text-xs font-medium tracking-[0.3em] text-lotus-400 uppercase">{t.reviewsEyebrow}</p>
+              <h2 className="mt-3 font-display text-4xl text-white sm:text-5xl">
                 <HighlightTitle text={t.reviews} tone="dark" />
               </h2>
-              <div className="folk-rule mx-auto mt-4 w-24" />
             </div>
-            <ul className="scrollbar-none -mx-4 flex snap-x snap-mandatory gap-5 overflow-x-auto px-4 pb-2 lg:mx-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:px-0">
-              {home.reviews.map((review) => {
-                // Bangla text: no italics (breaks conjuncts) and a Bangla-capable font
-                const bangla = /[ঀ-৿]/.test(review.comment);
-                return (
-                  <li key={review.id} className="flex w-[85%] shrink-0 snap-center flex-col sm:w-[46%] rounded-2xl border border-white/10 bg-white/[0.04] p-7 backdrop-blur-sm transition hover:border-gold-light/30 hover:bg-white/[0.06] lg:w-auto">
-                    <div className="flex items-center justify-between">
-                      <div className="flex gap-1" aria-label={`${review.rating} / 5`}>
-                        {Array.from({ length: 5 }, (_, star) => (
-                          <Star key={star} className={`size-4 ${star < review.rating ? "fill-marigold-400 text-marigold-400" : "text-white/20"}`} aria-hidden />
-                        ))}
-                      </div>
-                      <span className="font-display text-5xl leading-none text-gold-light/25" aria-hidden>
-                        &rdquo;
-                      </span>
-                    </div>
-                    <blockquote lang={bangla ? "bn" : undefined} className={`mt-3 flex-1 leading-relaxed text-ivory-50 ${bangla ? "font-bangla text-[17px]" : "font-display text-xl italic"}`}>
-                      {review.comment}
-                    </blockquote>
-                    <div className="mt-6 flex items-center gap-3 border-t border-white/10 pt-5">
-                      <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--color-gold-light),var(--color-saffron))] font-display text-lg text-navy-950">
-                        {review.customer_name.charAt(0)}
-                      </span>
-                      <span>
-                        <span className="block text-sm font-medium text-white">{review.customer_name}</span>
-                        {review.source === "facebook" && <span className="block text-xs text-white/50">{t.reviewsSource}</span>}
-                      </span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            {store.facebook_url && (
-              <p className="mt-10 text-center">
-                <a href={`${store.facebook_url.replace(/\/$/, "")}/reviews`} target="_blank" rel="noreferrer" className="text-sm text-gold-light underline-offset-4 hover:underline">
-                  {t.reviewsAll} →
-                </a>
-              </p>
+            <ReviewsCarousel reviews={home.reviews} t={t} />
+            {(store.facebook_url || store.whatsapp_number) && (
+              <div className="mt-10 flex flex-wrap justify-center gap-3">
+                {store.facebook_url && (
+                  <a href={`${store.facebook_url.replace(/\/$/, "")}/reviews`} target="_blank" rel="noreferrer" className="rounded-full border border-white/25 px-6 py-3 text-sm font-medium text-white transition hover:border-white hover:bg-white/10">
+                    {t.reviewsAll}
+                  </a>
+                )}
+                {store.facebook_url && (
+                  <a href={`${store.facebook_url.replace(/\/$/, "")}/reviews`} target="_blank" rel="noreferrer" className="group flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,var(--color-gold-light),var(--color-saffron))] px-6 py-3 text-sm font-semibold text-navy-950 shadow-[0_10px_30px_-10px_rgba(229,147,42,0.7)] transition hover:-translate-y-0.5">
+                    {t.reviewsWrite} <span className="transition group-hover:translate-x-1">→</span>
+                  </a>
+                )}
+              </div>
             )}
           </div>
         </section>

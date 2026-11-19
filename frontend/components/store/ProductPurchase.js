@@ -20,7 +20,7 @@ export default function ProductPurchase({ product, lang, t }) {
   const variant = product.variants.find((v) => v.id === variantId);
   const max = Math.max(1, variant?.max_quantity || 1);
   const soldOut = !variant || variant.stock_status === "out_of_stock";
-  const showVariants = product.variants.length > 1 && product.variants.some((v) => v.title || Object.keys(v.options || {}).length);
+  const showVariants = product.variants.some((v) => Object.keys(v.options || {}).length);
 
   const badge = !variant
     ? null

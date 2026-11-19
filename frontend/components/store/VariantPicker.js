@@ -21,6 +21,18 @@ export default function VariantPicker({ product, value, onChange, t }) {
   const selected = product.variants.find((variant) => variant.id === value);
   const selectedIndex = product.variants.indexOf(selected);
 
+  // One variant: nothing to choose, just state the colour (e.g. "COLOR Golden" with its swatch)
+  if (product.variants.length === 1) {
+    const only = product.variants[0];
+    return (
+      <div className="mt-6 flex items-center gap-3">
+        <span className="text-xs font-medium tracking-[0.18em] text-navy-900 uppercase">{names.join(" / ") || t.variant}</span>
+        {useSwatches && <span className="size-6 rounded-full shadow-[inset_0_1px_2px_rgba(0,0,0,0.25)] ring-1 ring-ivory-300" style={{ background: swatches[0] }} aria-hidden />}
+        <span className="text-sm text-ink/70">{variantLabel(only, 0)}</span>
+      </div>
+    );
+  }
+
   return (
     <fieldset className="mt-6">
       <legend className="text-xs font-medium tracking-[0.18em] text-navy-900 uppercase">

@@ -59,7 +59,7 @@ export default function QuickView({ slug, open, onClose, lang, t }) {
   const image = images[Math.min(imageIndex, images.length - 1)];
   const max = Math.max(1, variant?.max_quantity || 1);
   const soldOut = !variant || variant.stock_status === "out_of_stock";
-  const showVariants = (product?.variants.length || 0) > 1 && product.variants.some((v) => v.title || Object.keys(v.options || {}).length);
+  const showVariants = Boolean(product?.variants.some((v) => Object.keys(v.options || {}).length));
 
   const stockBadge = !variant
     ? null

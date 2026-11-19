@@ -69,6 +69,7 @@ class OrderResource extends JsonResource
                 'product_id' => $item->product_id,
                 'variant_id' => $item->variant_id,
                 'product_name' => $item->product_name,
+                'image_url' => $this->itemImageUrl($item),
                 'variant_title' => $item->variant_title,
                 'sku' => $item->sku,
                 'unit_price' => $item->unit_price,
@@ -95,5 +96,21 @@ class OrderResource extends JsonResource
                 'at' => $note->created_at?->toIso8601String(),
             ])),
         ];
+    }
+
+    /**
+     * Small photo for an order line: the photo linked to the ordered colour if there is one,
+     * otherwise the product's main photo. Null when the product has been deleted.
+     */
+    private function itemImageUrl(OrderItem $item): ?string
+    {
+        if (! $item->relationLoaded('product') || $item->product === null || ! $item->product->relationLoaded('images')) {
+            return null;
+        }
+
+        $images = $item->product->images;
+        $image = $images->firstWhere('variant_id', $item->variant_id) ?? $images->firstWhere('is_primary', true) ?? $images->first();
+
+        return $image?->urls()['sm'];
     }
 }

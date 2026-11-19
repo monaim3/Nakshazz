@@ -22,7 +22,7 @@ use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
-    private const DETAIL_RELATIONS = ['items', 'payments', 'statusHistories.user:id,name', 'notes.user:id,name', 'creator:id,name'];
+    private const DETAIL_RELATIONS = ['items.product.images', 'payments', 'statusHistories.user:id,name', 'notes.user:id,name', 'creator:id,name'];
 
     public function __construct(private OrderService $orders) {}
 

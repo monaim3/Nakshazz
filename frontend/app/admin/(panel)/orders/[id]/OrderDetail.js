@@ -99,8 +99,14 @@ function ItemsCard({ order, isOwner, canReturn, onReturn }) {
     >
       <ul className="divide-y divide-ink-100">
         {order.items.map((item) => (
-          <li key={item.id} className="flex items-start justify-between gap-4 px-5 py-3">
-            <div className="min-w-0">
+          <li key={item.id} className="flex items-start gap-4 px-5 py-3">
+            <span className="size-14 shrink-0 overflow-hidden rounded-lg bg-cream-200 ring-1 ring-ink-100">
+              {item.image_url && (
+                // eslint-disable-next-line @next/next/no-img-element -- small WebP from the API host
+                <img src={item.image_url} alt="" loading="lazy" className="size-full object-cover" />
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
               <p className="font-medium text-ink-900">{item.product_name}</p>
               <p className="text-xs text-ink-400">
                 {item.variant_title !== "Default" && `${item.variant_title} · `}SKU {item.sku}

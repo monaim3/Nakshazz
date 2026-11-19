@@ -111,7 +111,7 @@ export default function ReviewsCarousel({ reviews, t }) {
               onClick={() => setActive(index)}
               aria-label={`${index + 1} / ${count}`}
               aria-current={index === active}
-              className={`h-2 rounded-full transition-all duration-500 ${index === active ? "w-8 bg-gold-light" : "w-2 bg-white/30 hover:bg-white/60"}`}
+              className={`relative h-2 rounded-full transition-all duration-500 after:absolute after:-inset-x-1 after:-inset-y-3.5 ${index === active ? "w-8 bg-gold-light" : "w-2 bg-white/30 hover:bg-white/60"}`}
             />
           ))}
         </div>

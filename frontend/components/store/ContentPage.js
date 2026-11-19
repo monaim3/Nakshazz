@@ -13,7 +13,7 @@ export default function ContentPage({ page, lang, dict, title, aside = null }) {
   return (
     <div className="mx-auto max-w-3xl px-4 pt-8 pb-20 sm:px-6">
       <nav aria-label={dict.shop.breadcrumb} className="flex items-center justify-center gap-1 text-xs text-ink/55">
-        <Link href={localePath(lang, "/")} className="hover:text-navy-900">
+        <Link href={localePath(lang, "/")} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
           {dict.shop.home}
         </Link>
         <ChevronRight className="size-3" />

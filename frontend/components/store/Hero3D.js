@@ -98,7 +98,7 @@ export default function Hero3D({ t, lang }) {
               onClick={() => setStep((current) => (active === index ? current : current + 1))}
               aria-label={item.name}
               aria-current={active === index}
-              className={`h-1 rounded-full transition-all duration-500 ${active === index ? "w-8 bg-gold-light" : "w-3 bg-white/25 hover:bg-white/50"}`}
+              className={`relative h-1 rounded-full transition-all duration-500 after:absolute after:-inset-x-1 after:-inset-y-4 ${active === index ? "w-8 bg-gold-light" : "w-3 bg-white/25 hover:bg-white/50"}`}
             />
           ))}
         </div>

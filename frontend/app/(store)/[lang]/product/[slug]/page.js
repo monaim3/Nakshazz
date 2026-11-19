@@ -82,17 +82,17 @@ async function ProductContent({ params }) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <nav aria-label={dict.shop.breadcrumb} className="flex flex-wrap items-center gap-1 pt-6 pb-6 text-xs text-ink/55">
-        <Link href={localePath(lang, "/")} className="hover:text-navy-900">
+        <Link href={localePath(lang, "/")} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
           {dict.shop.home}
         </Link>
         <ChevronRight className="size-3" />
-        <Link href={localePath(lang, "/shop")} className="hover:text-navy-900">
+        <Link href={localePath(lang, "/shop")} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
           {dict.shop.title.replace(/\*/g, "")}
         </Link>
         {product.category && (
           <>
             <ChevronRight className="size-3" />
-            <Link href={localePath(lang, `/category/${product.category.slug}`)} className="hover:text-navy-900">
+            <Link href={localePath(lang, `/category/${product.category.slug}`)} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
               {product.category.name}
             </Link>
           </>

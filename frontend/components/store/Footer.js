@@ -104,7 +104,7 @@ function FooterColumn({ title, children }) {
 
 function FooterLink({ href, children }) {
   return (
-    <Link href={href} className="w-fit hover:text-marigold-300">
+    <Link href={href} className="relative w-fit after:absolute after:inset-x-0 after:-inset-y-1.5 hover:text-marigold-300">
       {children}
     </Link>
   );

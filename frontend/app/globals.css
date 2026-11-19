@@ -249,3 +249,12 @@ html[lang="bn"] .italic {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
 }
+
+/* Phones: iOS Safari zooms the whole page when a focused field's text is under 16px. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

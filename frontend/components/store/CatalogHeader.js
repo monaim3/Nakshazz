@@ -11,14 +11,14 @@ export default function CatalogHeader({ lang, dict, title, intro, categories, ac
   return (
     <header className="pt-6 pb-6 text-center lg:pt-8">
       <nav aria-label={t.breadcrumb} className="flex flex-wrap items-center justify-center gap-1 text-xs text-ink/55">
-        <Link href={localePath(lang, "/")} className="hover:text-navy-900">
+        <Link href={localePath(lang, "/")} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
           {t.home}
         </Link>
         {crumbs.map((crumb) => (
           <span key={crumb.label} className="flex items-center gap-1">
             <ChevronRight className="size-3" />
             {crumb.href ? (
-              <Link href={localePath(lang, crumb.href)} className="hover:text-navy-900">
+              <Link href={localePath(lang, crumb.href)} className="relative after:absolute after:-inset-x-1 after:-inset-y-2.5 hover:text-navy-900">
                 {crumb.label}
               </Link>
             ) : (

@@ -20,6 +20,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::apiResource('categories', Admin\CategoryController::class)->except('show');
     Route::apiResource('products', Admin\ProductController::class);
     Route::post('products/{product}/images', [Admin\ProductImageController::class, 'store'])->name('products.images.store');
+    Route::post('products/{product}/tryon', [Admin\ProductTryOnController::class, 'store'])->name('products.tryon.store');
+    Route::delete('products/{product}/tryon', [Admin\ProductTryOnController::class, 'destroy'])->name('products.tryon.destroy');
     Route::patch('images/{image}', [Admin\ProductImageController::class, 'update'])->name('images.update');
     Route::delete('images/{image}', [Admin\ProductImageController::class, 'destroy'])->name('images.destroy');
 

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Enums\ProductStatus;
+use App\Enums\TryOnType;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use Illuminate\Foundation\Http\FormRequest;
@@ -37,6 +38,8 @@ class SaveProductRequest extends FormRequest
             'preparation_days' => ['nullable', 'integer', 'min:0', 'max:365'],
             'seo_title' => ['nullable', 'string', 'max:70'],
             'seo_description' => ['nullable', 'string', 'max:170'],
+            'tryon_type' => ['nullable', Rule::enum(TryOnType::class)],
+            'tryon_size_mm' => ['nullable', 'integer', 'min:2', 'max:600'],
 
             'variants' => [$isCreate ? 'required' : 'sometimes', 'array', 'min:1', 'max:50'],
             'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product?->id ?? 0)],

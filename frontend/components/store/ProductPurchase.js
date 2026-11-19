@@ -7,10 +7,11 @@ import { addToCart, openCartDrawer } from "@/lib/cart-storage";
 import { localePath, localizeDigits } from "@/lib/i18n";
 import FavouriteButton from "./FavouriteButton";
 import Price from "./Price";
+import TryOnButton from "./TryOnButton";
 import VariantPicker from "./VariantPicker";
 
 /** Price, stock, variant, quantity and the two buy buttons on the product page. */
-export default function ProductPurchase({ product, lang, t }) {
+export default function ProductPurchase({ product, lang, t, tryOnT }) {
   const router = useRouter();
   const preferred = product.variants.find((v) => v.is_default && v.stock_status !== "out_of_stock") || product.variants.find((v) => v.stock_status !== "out_of_stock") || product.variants[0];
   const [variantId, setVariantId] = useState(preferred?.id ?? null);
@@ -101,6 +102,7 @@ export default function ProductPurchase({ product, lang, t }) {
           <Zap className="size-4" /> {t.buyNow}
         </button>
       </div>
+      {tryOnT && <TryOnButton product={product} t={tryOnT} />}
     </div>
   );
 }

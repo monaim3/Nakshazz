@@ -122,7 +122,7 @@ async function ProductContent({ params }) {
           {product.short_description && <p className="mt-4 leading-relaxed text-ink/70">{product.short_description}</p>}
 
           <div className="mt-6">
-            <ProductPurchase product={product} lang={lang} t={t} />
+            <ProductPurchase product={product} lang={lang} t={t} tryOnT={dict.tryon} />
           </div>
 
           {/* Promises */}

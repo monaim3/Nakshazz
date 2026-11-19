@@ -308,5 +308,30 @@
         "network": "Connection problem. Please try again."
       }
     }
+  },
+  "tryon": {
+    "button": "Try it on — see it on you",
+    "title": "Virtual try-on",
+    "close": "Close",
+    "headline": "See it on you",
+    "tip_earring": "Face the camera, tuck your hair behind your ears and use good light.",
+    "tip_necklace": "Face the camera and keep your neck and shoulders in the picture.",
+    "tip_nose": "Face the camera from close up, in good light.",
+    "useCamera": "Use camera",
+    "uploadPhoto": "Upload a photo",
+    "privacy": "Your photo stays on your device — nothing is uploaded.",
+    "loading": "Getting ready…",
+    "noFace": "No face found — face the camera in good light",
+    "size": "Size",
+    "position": "Position",
+    "left": "Left side",
+    "right": "Right side",
+    "capture": "Take photo",
+    "save": "Save photo",
+    "again": "Try again",
+    "errorLoad": "Could not load the try-on. Please check your connection and try again.",
+    "errorCamera": "Could not open the camera. You can upload a photo instead.",
+    "errorCameraDenied": "Camera access was blocked. Allow it in your browser, or upload a photo instead.",
+    "errorPiece": "Could not load this piece's try-on photo."
   }
 }

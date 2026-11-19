@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ProductStatus;
 use App\Enums\ReviewStatus;
+use App\Enums\TryOnType;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 #[Fillable([
     'category_id', 'name', 'slug', 'short_description', 'description', 'status',
     'is_featured', 'is_made_to_order', 'preparation_days', 'seo_title', 'seo_description',
+    'tryon_type', 'tryon_size_mm',
 ])]
 class Product extends Model
 {
@@ -32,6 +34,8 @@ class Product extends Model
             'status' => ProductStatus::class,
             'is_featured' => 'boolean',
             'is_made_to_order' => 'boolean',
+            'tryon_type' => TryOnType::class,
+            'tryon_size_mm' => 'integer',
         ];
     }
 

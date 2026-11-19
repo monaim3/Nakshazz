@@ -22,6 +22,11 @@ class ProductDetailResource extends ProductCardResource
             'images' => ImageResource::collection($this->images),
             'variants' => VariantResource::collection($this->activeVariants),
             'option_names' => $this->optionNames(),
+            'tryon' => $this->tryon_type && $this->tryon_image_path ? [
+                'type' => $this->tryon_type,
+                'size_mm' => $this->tryon_size_mm ?? $this->tryon_type->defaultSizeMm(),
+                'image_path' => $this->tryon_image_path,
+            ] : null,
             'seo' => [
                 'title' => $this->seo_title ?: $this->name,
                 'description' => $this->seo_description ?: $this->short_description,

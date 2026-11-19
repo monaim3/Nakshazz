@@ -7,6 +7,7 @@ import { useProductQuery } from "@/store/admin/catalogApi";
 import { ErrorBlock, LoadingBlock, StatusBadge } from "@/components/admin/ui";
 import ProductForm from "./ProductForm";
 import ImageManager from "./ImageManager";
+import TryOnManager from "./TryOnManager";
 
 /** Loads the product (when editing) and mounts the form with it. */
 export default function ProductEditor({ editing = false }) {
@@ -36,7 +37,14 @@ export default function ProductEditor({ editing = false }) {
       <ProductForm
         key={product?.updated_at || "new"}
         product={product}
-        imagesSlot={product ? <ImageManager product={product} /> : null}
+        imagesSlot={
+          product ? (
+            <>
+              <ImageManager product={product} />
+              <TryOnManager product={product} />
+            </>
+          ) : null
+        }
         onCreated={(created) => router.replace(`/admin/products/${created.id}?created=1`)}
       />
     </>

@@ -30,6 +30,14 @@ export const catalogApi = adminApi.injectEndpoints({
       query: ({ id, productId, ...body }) => ({ url: `/admin/images/${id}`, method: "PATCH", body }),
       invalidatesTags: (result, error, { productId }) => ["Product", { type: "Product", id: productId }],
     }),
+    uploadTryOnImage: build.mutation({
+      query: ({ productId, formData }) => ({ url: `/admin/products/${productId}/tryon`, method: "POST", body: formData }),
+      invalidatesTags: (result, error, { productId }) => ["Product", { type: "Product", id: productId }],
+    }),
+    deleteTryOnImage: build.mutation({
+      query: ({ productId }) => ({ url: `/admin/products/${productId}/tryon`, method: "DELETE" }),
+      invalidatesTags: (result, error, { productId }) => ["Product", { type: "Product", id: productId }],
+    }),
     deleteProductImage: build.mutation({
       query: ({ id }) => ({ url: `/admin/images/${id}`, method: "DELETE" }),
       invalidatesTags: (result, error, { productId }) => ["Product", { type: "Product", id: productId }],
@@ -76,6 +84,8 @@ export const {
   useUploadProductImagesMutation,
   useUpdateProductImageMutation,
   useDeleteProductImageMutation,
+  useUploadTryOnImageMutation,
+  useDeleteTryOnImageMutation,
   useCategoriesQuery,
   useSaveCategoryMutation,
   useDeleteCategoryMutation,

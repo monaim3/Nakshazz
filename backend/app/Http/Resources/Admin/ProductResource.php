@@ -6,6 +6,7 @@ use App\Http\Resources\Storefront\ImageResource;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @mixin Product
@@ -31,6 +32,11 @@ class ProductResource extends JsonResource
             'preparation_days' => $this->preparation_days,
             'seo_title' => $this->seo_title,
             'seo_description' => $this->seo_description,
+            'tryon' => [
+                'type' => $this->tryon_type,
+                'size_mm' => $this->tryon_size_mm,
+                'image_url' => $this->tryon_image_path ? Storage::disk('public')->url($this->tryon_image_path) : null,
+            ],
             'variants' => VariantResource::collection($this->whenLoaded('variants')),
             'images' => ImageResource::collection($this->whenLoaded('images')),
             'primary_image' => $this->whenLoaded('primaryImage', fn () => $this->primaryImage ? new ImageResource($this->primaryImage) : null),

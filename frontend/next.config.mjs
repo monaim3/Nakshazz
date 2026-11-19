@@ -15,6 +15,12 @@ const nextConfig = {
     staticGenerationRetryCount: 3,
   },
   partialPrefetching: true,
+  // Same-origin proxy for uploaded media: the virtual try-on draws product photos on a canvas
+  // and saves the result, which browsers only allow for same-origin (or CORS) images.
+  async rewrites() {
+    const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
+    return [{ source: "/media/:path*", destination: `${backend}/storage/:path*` }];
+  },
   turbopack: {
     rules: {
       "*.css": {

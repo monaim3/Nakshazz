@@ -10,6 +10,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendor files (MediaPipe wasm loader for the virtual try-on)
+    "public/tryon/**",
   ]),
 ]);
 

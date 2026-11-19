@@ -167,6 +167,42 @@ class AdminApiTest extends TestCase
     }
 
     #[Test]
+    public function try_on_photo_keeps_transparency_and_is_exposed_on_the_storefront(): void
+    {
+        Storage::fake('public');
+        $product = Product::factory()->withDefaultVariant()->create();
+        $this->actingAs($this->staff)->putJson("/api/v1/admin/products/{$product->id}", ['status' => 'active', 'tryon_type' => 'earring', 'tryon_size_mm' => 52])->assertOk();
+
+        // transparent 300x600 PNG with a solid block in the middle
+        $canvas = imagecreatetruecolor(300, 600);
+        imagesavealpha($canvas, true);
+        imagefill($canvas, 0, 0, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
+        imagefilledrectangle($canvas, 100, 200, 200, 400, imagecolorallocate($canvas, 200, 30, 80));
+        $file = tempnam(sys_get_temp_dir(), 'tryon').'.png';
+        imagepng($canvas, $file);
+
+        $this->actingAs($this->staff)->post("/api/v1/admin/products/{$product->id}/tryon", [
+            'image' => new UploadedFile($file, 'earring.png', 'image/png', null, true),
+        ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.tryon.type', 'earring');
+
+        $product->refresh();
+        $path = $product->tryon_image_path;
+        Storage::disk('public')->assertExists($path);
+        $stored = imagecreatefromstring(Storage::disk('public')->get($path));
+        $this->assertSame(127, (imagecolorat($stored, 5, 5) >> 24) & 0x7F, 'corner stays fully transparent');
+
+        $this->getJson("/api/v1/products/{$product->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.tryon.type', 'earring')
+            ->assertJsonPath('data.tryon.size_mm', 52)
+            ->assertJsonPath('data.tryon.image_path', $path);
+
+        $this->actingAs($this->staff)->deleteJson("/api/v1/admin/products/{$product->id}/tryon")->assertOk();
+        Storage::disk('public')->assertMissing($path);
+        $this->getJson("/api/v1/products/{$product->slug}")->assertJsonPath('data.tryon', null);
+    }
+
+    #[Test]
     public function product_with_sales_history_is_archived_not_deleted(): void
     {
         $variant = ProductVariant::factory()->for(Product::factory())->withStock(5)->create();

@@ -13,7 +13,7 @@ const MAX_SIDE = 1100;
  * cleans up leftovers. `onDone(file)` receives a transparent, tightly cropped PNG.
  * Mounted by the parent only while open, so it always starts fresh.
  */
-export default function CutoutTool({ open, onClose, onDone, saving }) {
+export default function CutoutTool({ open, onClose, onDone, saving, images = [] }) {
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const state = useRef({ w: 0, h: 0, rgba: null, mask: null, pieces: [], erased: null });
@@ -88,6 +88,20 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
     }
   }
 
+  /** Uses a photo the product already has (loaded through /media so the canvas may read it). */
+  async function startFromProduct(image) {
+    setError("");
+    setStage("working");
+    try {
+      const response = await fetch(image.urls.lg.replace(/^.*?\/storage\//, "/media/"));
+      if (!response.ok) throw new Error("load failed");
+      await start(await response.blob());
+    } catch {
+      setError("Could not load this photo. Please try again.");
+      setStage("pick");
+    }
+  }
+
   function erase(event) {
     const canvas = canvasRef.current;
     const box = canvas.getBoundingClientRect();
@@ -147,10 +161,27 @@ export default function CutoutTool({ open, onClose, onDone, saving }) {
   return (
     <Modal open={open} onClose={onClose} title="Make try-on photo from a product photo" size="lg">
       <div className="space-y-4">
-        {stage === "pick" && (
+        {stage === "pick" && images.length > 0 && (
+          <div className="space-y-3">
+            <p className="text-sm text-ink-600">Pick one of this product&apos;s photos. Front view works best — the background, the stand and the second earring are removed automatically.</p>
+            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+              {images.map((image) => (
+                <button key={image.id} type="button" onClick={() => startFromProduct(image)} className="overflow-hidden rounded-xl ring-1 ring-ink-100 transition hover:ring-2 hover:ring-gold-500">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- admin preview from API host */}
+                  <img src={image.urls.md} alt={image.alt || ""} className="aspect-square w-full object-cover" />
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => fileRef.current?.click()} className="text-xs text-ink-400 underline underline-offset-2 hover:text-ink-700">
+              Use a different photo from this computer
+            </button>
+          </div>
+        )}
+
+        {stage === "pick" && images.length === 0 && (
           <button type="button" onClick={() => fileRef.current?.click()} className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-ink-200 px-6 py-12 text-center text-sm text-ink-600 transition hover:border-gold-400 hover:bg-cream-100">
             <ImageUp className="size-8 text-ink-300" />
-            <span className="font-medium text-ink-800">Choose a product photo</span>
+            <span className="font-medium text-ink-800">This product has no photos yet — choose one from this computer</span>
             <span className="text-xs text-ink-400">Front view works best. The background, the stand and the second earring are removed automatically.</span>
           </button>
         )}

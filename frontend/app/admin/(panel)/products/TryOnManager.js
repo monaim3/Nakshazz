@@ -114,7 +114,7 @@ export default function TryOnManager({ product }) {
             )}
           </div>
           <input ref={inputRef} type="file" accept="image/png,image/webp" hidden onChange={(event) => onFile(event.target.files?.[0])} />
-          {cutoutOpen && <CutoutTool open onClose={() => setCutoutOpen(false)} saving={uploadState.isLoading} onDone={async (file) => (await onFile(file)) && setCutoutOpen(false)} />}
+          {cutoutOpen && <CutoutTool open images={product.images || []} onClose={() => setCutoutOpen(false)} saving={uploadState.isLoading} onDone={async (file) => (await onFile(file)) && setCutoutOpen(false)} />}
         </div>
       </div>
     </Card>

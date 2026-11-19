@@ -272,5 +272,41 @@
     "trackButton": "Track",
     "tooMany": "Too many attempts. Please wait a minute and try again.",
     "networkError": "Connection problem. Please try again."
+  },
+  "pages": {
+    "updated": "Last updated :date",
+    "aboutTitle": "Our *story*",
+    "aboutDescription": "Nakshazz makes handmade jewellery in small batches in Dhaka — earrings, chandbali, clay and resin jewellery and necklaces.",
+    "titles": {
+      "delivery-policy": "Delivery *policy*",
+      "return-refund-policy": "Return & refund *policy*",
+      "privacy-policy": "Privacy *policy*"
+    },
+    "contactTitle": "Get in *touch*",
+    "contactIntro": "Questions about a piece, an order or a custom design? We usually reply within a few hours.",
+    "call": "Call us",
+    "emailUs": "Email",
+    "location": "Studio",
+    "locationValue": "Dhaka, Bangladesh",
+    "hours": "Every day, 10am – 9pm",
+    "formTitle": "Send us a message",
+    "form": {
+      "name": "Your name",
+      "phone": "Mobile number",
+      "email": "Email",
+      "message": "Message",
+      "messageHint": "Tell us what you need — a product, an order number, a custom request…",
+      "send": "Send message",
+      "sentTitle": "Message sent!",
+      "sentText": "Thank you — we'll get back to you soon.",
+      "errors": {
+        "name": "Please enter your name.",
+        "contact": "Add your mobile number or email so we can reply.",
+        "message": "Please write at least a few words.",
+        "tooMany": "Too many messages. Please try again later.",
+        "generic": "Could not send. Please check your details.",
+        "network": "Connection problem. Please try again."
+      }
+    }
   }
 }

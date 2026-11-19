@@ -287,7 +287,8 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
             {methods.includes("bkash") && (
               <label className="flex cursor-pointer items-center gap-3 rounded-2xl border border-ivory-300 bg-white p-4 transition has-checked:border-[#e2136e] has-checked:ring-1 has-checked:ring-[#e2136e]">
                 <input type="radio" value="bkash" className="size-4 accent-[#e2136e]" {...register("method")} />
-                <span className="flex size-6 items-center justify-center rounded-md bg-[#e2136e] text-[10px] font-bold text-white">b</span>
+                {/* eslint-disable-next-line @next/next/no-img-element -- small static SVG */}
+                <img src="/brand/bkash.svg" alt="" width="32" height="32" className="size-8 shrink-0" />
                 <span>
                   <span className="block text-sm font-medium text-navy-900">{t.bkash}</span>
                   <span className="block text-xs text-ink/60">{t.bkashHint}</span>

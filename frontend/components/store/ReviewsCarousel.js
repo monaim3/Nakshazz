@@ -45,7 +45,7 @@ export default function ReviewsCarousel({ reviews, t }) {
       aria-roledescription="carousel"
       aria-label={t.reviews.replace(/\*/g, "")}
     >
-      <div className="relative mx-auto h-[320px] max-w-5xl [perspective:1400px] sm:h-[340px]">
+      <div className="relative mx-auto h-[330px] max-w-6xl touch-pan-y [--cw:280px] [perspective:1200px] sm:h-[340px] sm:[--cw:360px]">
         {reviews.map((review, index) => {
           // signed distance from the active card, wrapped around: -1 left, 0 centre, 1 right
           let offset = (index - active + count) % count;
@@ -59,12 +59,14 @@ export default function ReviewsCarousel({ reviews, t }) {
               key={review.id}
               aria-hidden={!center}
               onClick={() => !center && setActive(index)}
-              className={`absolute top-1/2 left-1/2 flex h-[290px] w-[86%] max-w-[400px] flex-col rounded-3xl border p-7 transition-all duration-700 ease-[cubic-bezier(.22,.8,.24,1)] sm:h-[300px] sm:w-[380px] ${
-                center ? "z-20 cursor-default border-white/15 bg-navy-900 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.7)]" : "z-10 cursor-pointer border-white/10 bg-[linear-gradient(135deg,rgba(209,30,88,0.28),rgba(15,27,53,0.9)_75%)]"
+              className={`absolute top-0 left-[calc(50%-var(--cw)/2)] flex h-full w-[var(--cw)] flex-col rounded-[20px] border p-6 transition-[transform,opacity] duration-[600ms] ease-[cubic-bezier(.22,.8,.24,1)] [transform-style:preserve-3d] sm:p-7 ${
+                center ? "z-20 cursor-default border-white/15 bg-navy-900 shadow-[0_30px_70px_-20px_rgba(0,0,0,0.7)]" : `z-10 cursor-pointer border-white/10 bg-navy-900 ${offset < 0 ? "bg-[linear-gradient(to_left,rgba(209,30,88,0.4),rgba(209,30,88,0.08)_65%,rgba(15,27,53,0))]" : "bg-[linear-gradient(to_right,rgba(209,30,88,0.4),rgba(209,30,88,0.08)_65%,rgba(15,27,53,0))]"}`
               } ${visible ? "" : "pointer-events-none opacity-0"}`}
               style={{
-                transform: `translate(-50%, -50%) translateX(${offset * 92}%) translateZ(${center ? 0 : -160}px) rotateY(${offset * -24}deg) scale(${center ? 1 : 0.9})`,
-                opacity: visible ? (center ? 1 : 0.75) : 0,
+                // same geometry as the reference: side cards 92% of a card away, turned 32°, scaled 0.88;
+                // the pink tint is strongest on the edge facing the centre card
+                transform: `translateX(calc(var(--cw) * ${offset * 0.92})) rotateY(${offset * -32}deg) scale(${center ? 1 : 0.88})`,
+                opacity: visible ? 1 : 0,
               }}
             >
               <div className="flex items-center gap-4">

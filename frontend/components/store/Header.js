@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Heart, Menu, Search, ShoppingBag, X } from "lucide-react";
@@ -10,6 +11,9 @@ import { localePath, stripLocale } from "@/lib/i18n";
 import { openCartDrawer, useCartCount } from "@/lib/cart-storage";
 import { useWishlistCount } from "@/lib/wishlist-storage";
 import logo from "@/public/brand/logo-badge-320.webp";
+
+// loaded on the first tap of the search icon
+const SearchOverlay = dynamic(() => import("./SearchOverlay"), { ssr: false });
 
 /** The নকসাজ badge logo (transparent PNG). `compact` = smaller, used once the header is solid. */
 function Logo({ compact = false, alt }) {
@@ -82,6 +86,7 @@ export default function Header({ lang, dict, categories }) {
   const isHome = path === "/";
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
   const count = useCartCount();
   const favourites = useWishlistCount();
   const overlay = isHome && !scrolled && !open;
@@ -142,13 +147,27 @@ export default function Header({ lang, dict, categories }) {
             label={dict.nav.languageLabel}
             className="mr-1 hidden sm:flex"
           />
-          <Link
+          {/* Opens the search sheet (without JavaScript: the shop page, which has its own search) */}
+          <a
             href={localePath(lang, "/shop")}
+            onClick={(event) => {
+              event.preventDefault();
+              setSearching(true);
+            }}
             className={iconClass}
             aria-label={dict.nav.search}
+            aria-haspopup="dialog"
           >
             <Search className="size-5" strokeWidth={1.5} />
-          </Link>
+          </a>
+          {searching && (
+            <SearchOverlay
+              lang={lang}
+              categories={categories}
+              onClose={() => setSearching(false)}
+              t={{ title: dict.nav.search, close: dict.nav.close, placeholder: dict.shop.searchPlaceholder, empty: dict.shop.empty, from: dict.product.from, all: dict.nav.searchAll, failed: dict.shop.loadError }}
+            />
+          )}
           <Link
             href={localePath(lang, "/wishlist")}
             className={`${iconClass} relative`}

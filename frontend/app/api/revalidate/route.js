@@ -21,7 +21,9 @@ export async function POST(request) {
   const body = await request.json().catch(() => ({}));
   const tags = Array.isArray(body.tags) ? body.tags.filter((tag) => typeof tag === "string" && /^[a-z0-9:_-]{1,120}$/.test(tag)).slice(0, 20) : [];
 
-  tags.forEach((tag) => revalidateTag(tag, "max"));
+  // Expire at once: an admin edit must be visible on the next visit. With the "max" profile the
+  // page was rebuilt from the still-stale cached data and stayed old (e.g. a new bKash number).
+  tags.forEach((tag) => revalidateTag(tag, { expire: 0 }));
 
   return Response.json({ revalidated: tags });
 }

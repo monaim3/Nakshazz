@@ -7,6 +7,11 @@ import { getPage } from "@/lib/storefront-api";
 
 const POLICIES = ["delivery-policy", "return-refund-policy", "privacy-policy"];
 
+// Rebuilt on the server after an admin edit. The header reads the page address
+// (usePathname) outside <Suspense>, which Next.js only accepts on a route that is allowed
+// to wait for the server; without this the rebuild failed and the page answered 500.
+export const instant = false;
+
 export function generateStaticParams() {
   return POLICIES.map((slug) => ({ slug }));
 }

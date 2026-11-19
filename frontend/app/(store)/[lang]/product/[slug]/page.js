@@ -13,6 +13,11 @@ import { getProduct, getProducts, getSettings } from "@/lib/storefront-api";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://nakshazz.com";
 
+// Rebuilt on the server after an admin edit. The header reads the page address
+// (usePathname) outside <Suspense>, which Next.js only accepts on a route that is allowed
+// to wait for the server; without this the rebuild failed and the page answered 500.
+export const instant = false;
+
 export async function generateStaticParams() {
   const result = await getProducts({ per_page: 48 }).catch(() => null);
   const slugs = result?.data?.map((product) => ({ slug: product.slug })) || [];

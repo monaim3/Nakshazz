@@ -6,6 +6,11 @@ import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { localePath } from "@/lib/i18n";
 import { getCategories, getCategory } from "@/lib/storefront-api";
 
+// Rebuilt on the server after an admin edit. The header reads the page address
+// (usePathname) outside <Suspense>, which Next.js only accepts on a route that is allowed
+// to wait for the server; without this the rebuild failed and the page answered 500.
+export const instant = false;
+
 export async function generateStaticParams() {
   const categories = await getCategories();
   return categories.length ? categories.map((category) => ({ slug: category.slug })) : [{ slug: "earrings" }];

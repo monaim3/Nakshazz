@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Sparkles, Trash2, Upload } from "lucide-react";
+import { Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { useDeleteTryOnImageMutation, useUpdateProductMutation, useUploadTryOnImageMutation } from "@/store/admin/catalogApi";
 import { Button, Card, Input, Select, Spinner, useToast } from "@/components/admin/ui";
+import CutoutTool from "./CutoutTool";
 
 const TYPES = [
   { value: "", label: "Off — no try-on for this product" },
@@ -19,9 +20,9 @@ const SIZE_HELP = {
 };
 
 const PHOTO_HELP = {
-  earring: "ONE earring, straight from the front, hook at the top, background removed (transparent PNG). The other ear is mirrored automatically.",
-  necklace: "The whole necklace from the front, the chain ends at the top corners, background removed (transparent PNG).",
-  nose: "The nose pin from the front, background removed (transparent PNG). Keep the image tightly cropped.",
+  earring: "ONE earring, straight from the front, hook at the top, background removed. The Make from a photo button cuts it out automatically. The other ear is mirrored in the shop.",
+  necklace: "The whole necklace from the front, the chain ends at the top corners, background removed. The Make from a photo button does it automatically (choose Everything).",
+  nose: "The nose pin from the front, background removed. The Make from a photo button does it automatically.",
 };
 
 /** Admin card: virtual try-on type, real size and the transparent photo used on the face. */
@@ -34,6 +35,7 @@ export default function TryOnManager({ product }) {
   const [upload, uploadState] = useUploadTryOnImageMutation();
   const [remove, removeState] = useDeleteTryOnImageMutation();
   const help = SIZE_HELP[type];
+  const [cutoutOpen, setCutoutOpen] = useState(false);
 
   async function save() {
     try {
@@ -46,18 +48,20 @@ export default function TryOnManager({ product }) {
   }
 
   async function onFile(file) {
-    if (!file) return;
+    if (!file) return false;
     if (!["image/png", "image/webp"].includes(file.type)) {
       notify("Use a PNG or WebP with a transparent background.", "error");
-      return;
+      return false;
     }
     const formData = new FormData();
     formData.append("image", file);
     try {
       await upload({ productId: product.id, formData }).unwrap();
-      notify("Try-on photo uploaded.");
+      notify("Try-on photo saved.");
+      return true;
     } catch (error) {
       notify(error.errors ? Object.values(error.errors)[0][0] : error.message, "error");
+      return false;
     } finally {
       if (inputRef.current) inputRef.current.value = "";
     }
@@ -96,9 +100,12 @@ export default function TryOnManager({ product }) {
               <span className="px-4 text-center text-xs text-ink-400">Transparent photo appears here</span>
             )}
           </div>
+          <Button size="sm" onClick={() => setCutoutOpen(true)} className="mt-2 w-full gap-1.5">
+            <Wand2 className="size-4" /> Make from a photo
+          </Button>
           <div className="mt-2 flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => inputRef.current?.click()} loading={uploadState.isLoading} className="flex-1 gap-1.5">
-              <Upload className="size-4" /> {imageUrl ? "Replace" : "Upload"}
+              <Upload className="size-4" /> {imageUrl ? "Replace PNG" : "Upload PNG"}
             </Button>
             {imageUrl && (
               <Button size="sm" variant="ghost" onClick={() => remove({ productId: product.id }).unwrap().then(() => notify("Try-on photo removed."))} loading={removeState.isLoading} aria-label="Remove try-on photo">
@@ -107,6 +114,7 @@ export default function TryOnManager({ product }) {
             )}
           </div>
           <input ref={inputRef} type="file" accept="image/png,image/webp" hidden onChange={(event) => onFile(event.target.files?.[0])} />
+          {cutoutOpen && <CutoutTool open onClose={() => setCutoutOpen(false)} saving={uploadState.isLoading} onDone={async (file) => (await onFile(file)) && setCutoutOpen(false)} />}
         </div>
       </div>
     </Card>

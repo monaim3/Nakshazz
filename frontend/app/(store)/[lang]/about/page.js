@@ -3,7 +3,7 @@ import ContentPage from "@/components/store/ContentPage";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { localePath } from "@/lib/i18n";
 import { getPage } from "@/lib/storefront-api";
-import badge from "@/public/brand/logo-badge-600.png";
+import badge from "@/public/brand/logo-badge-600.webp";
 
 export async function generateMetadata() {
   const [lang, dict, page] = await Promise.all([currentLang(), getDictionary(), getPage("about")]);

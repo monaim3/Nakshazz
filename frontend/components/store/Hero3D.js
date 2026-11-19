@@ -114,7 +114,7 @@ function BranchScene({ piece, bird }) {
     // The branch line runs along the top edge of this wrapper; the earrings hang from it.
     <div className="absolute inset-x-0 [--bw:130vw] sm:[--bw:84vw] lg:[--bw:70vw]" style={{ top: "var(--top)" }}>
       <div
-        className="absolute left-1/2 -translate-x-1/2 animate-[hero-hang-in_2.4s_cubic-bezier(.2,.75,.25,1)_0.8s_both] [transform-origin:50%_0]"
+        className="absolute left-1/2 -translate-x-1/2 animate-[hero-hang-in_2.4s_cubic-bezier(.2,.75,.25,1)_0.3s_both] [transform-origin:50%_0]"
         style={{
           aspectRatio: `${piece.w} / ${piece.h}`,
           top: "calc(var(--bw) * -0.004)",
@@ -122,8 +122,8 @@ function BranchScene({ piece, bird }) {
           height: `max(220px, min(620px, calc(100svh - var(--top) - 140px), calc(84vw * ${piece.h} / ${piece.w})))`,
         }}
       >
-        <div className="size-full animate-[hero-sway_5s_ease-in-out_3.2s_infinite] [transform-origin:50%_0]">
-          <Image src={piece.src} alt={piece.name} width={piece.w} height={piece.h} priority sizes="(min-width: 640px) 30vw, 70vw" className="size-full object-contain drop-shadow-[0_30px_35px_rgba(5,10,25,0.65)]" />
+        <div className="size-full animate-[hero-sway_5s_ease-in-out_2.7s_infinite] [transform-origin:50%_0]">
+          <Image src={piece.src} alt={piece.name} width={piece.w} height={piece.h} preload fetchPriority="high" loading="eager" sizes="(min-width: 640px) 30vw, 70vw" className="size-full object-contain drop-shadow-[0_30px_35px_rgba(5,10,25,0.65)]" />
         </div>
       </div>
 

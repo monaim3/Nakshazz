@@ -77,10 +77,10 @@
   --color-ink: #17203a;
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-cormorant), var(--font-hind), ui-serif, Georgia, serif;
-  --font-script: var(--font-pinyon), var(--font-hind), "Brush Script MT", cursive;
-  --font-body: var(--font-jost), var(--font-hind), ui-sans-serif, system-ui, sans-serif;
-  --font-bangla: var(--font-hind), var(--font-jost), sans-serif;
+  --font-display: var(--font-cormorant), var(--font-hind, "Noto Sans Bengali"), ui-serif, Georgia, serif;
+  --font-script: var(--font-hind, "Noto Sans Bengali"), "Brush Script MT", cursive;
+  --font-body: var(--font-jost), var(--font-hind, "Noto Sans Bengali"), ui-sans-serif, system-ui, sans-serif;
+  --font-bangla: var(--font-hind, "Noto Sans Bengali"), var(--font-jost), sans-serif;
 
   --radius-card: 0.875rem;
 
@@ -91,13 +91,14 @@
     to { transform: translateX(0) rotate(0); opacity: 1; }
   }
   @keyframes hero-hang-in {
-    0% { transform: translateX(70vw) translateY(-30px) rotate(16deg); opacity: 0; }
-    15% { opacity: 1; }
+    /* Visible from the first frame (a sliver at the right edge), not faded in: the browser
+       then counts the hero picture as painted at once instead of seconds later. */
+    0% { transform: translateX(62vw) translateY(-30px) rotate(16deg); }
     55% { transform: translateX(-1.5vw) translateY(0) rotate(-7deg); }
     70% { transform: translateX(0) rotate(4deg); }
     82% { transform: rotate(-2deg); }
     92% { transform: rotate(1deg); }
-    100% { transform: translateX(0) rotate(0); opacity: 1; }
+    100% { transform: translateX(0) rotate(0); }
   }
   @keyframes hero-sway {
     0%, 100% { transform: rotate(0); }

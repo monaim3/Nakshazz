@@ -71,7 +71,8 @@ class CategoryController extends Controller
 
         if ($request->hasFile('image')) {
             $this->images->delete($category->image_path);
-            $category->image_path = $this->images->storeSingle($request->file('image'), 'categories', 1200);
+            $category->image_path = $this->images->storeSingle($request->file('image'), 'categories', 640);
+            $this->images->storeThumbnail($category->image_path);
         }
 
         $category->save();

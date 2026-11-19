@@ -9,7 +9,7 @@ import { Heart, Menu, Search, ShoppingBag, X } from "lucide-react";
 import { localePath, stripLocale } from "@/lib/i18n";
 import { openCartDrawer, useCartCount } from "@/lib/cart-storage";
 import { useWishlistCount } from "@/lib/wishlist-storage";
-import logo from "@/public/brand/logo-badge-600.png";
+import logo from "@/public/brand/logo-badge-320.webp";
 
 /** The নকসাজ badge logo (transparent PNG). `compact` = smaller, used once the header is solid. */
 function Logo({ compact = false, alt }) {
@@ -17,7 +17,7 @@ function Logo({ compact = false, alt }) {
     <Image
       src={logo}
       alt={alt}
-      priority
+      loading="eager"
       sizes="120px"
       className={`h-auto drop-shadow-[0_4px_10px_rgba(0,0,0,0.25)] transition-[width] duration-300 ${compact ? "w-[68px] lg:w-[84px]" : "w-[78px] lg:w-[112px]"}`}
     />

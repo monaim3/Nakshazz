@@ -21,6 +21,16 @@ const nextConfig = {
     const backend = (process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000").replace(/\/$/, "");
     return [{ source: "/media/:path*", destination: `${backend}/storage/:path*` }];
   },
+  // Files in /public are not fingerprinted, so Next sends them with no caching. These folders
+  // only hold versioned artwork and the try-on models: let browsers keep them for a month.
+  async headers() {
+    const month = [{ key: "Cache-Control", value: "public, max-age=2592000" }];
+    return [
+      { source: "/hero/:path*", headers: month },
+      { source: "/brand/:path*", headers: month },
+      { source: "/tryon/:path*", headers: month },
+    ];
+  },
   turbopack: {
     rules: {
       "*.css": {

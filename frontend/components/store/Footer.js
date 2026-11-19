@@ -3,7 +3,7 @@ import { cacheLife } from "next/cache";
 import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { localePath } from "@/lib/i18n";
-import badge from "@/public/brand/logo-badge-600.png";
+import badge from "@/public/brand/logo-badge-320.webp";
 import { FacebookIcon, InstagramIcon } from "./SocialIcons";
 
 /** Year for the copyright line; cached so the footer stays part of the static page. */

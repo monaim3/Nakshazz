@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Star } from "lucide-react";
@@ -12,7 +13,7 @@ import SocialSection from "@/components/store/SocialSection";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { getHome, getSettings } from "@/lib/storefront-api";
 import { localePath } from "@/lib/i18n";
-import badge from "@/public/brand/logo-badge-600.png";
+import badge from "@/public/brand/logo-badge-600.webp";
 
 export async function generateMetadata() {
   const lang = await currentLang();
@@ -57,7 +58,7 @@ export default async function HomePage() {
                       {category.image_url ? (
                         // eslint-disable-next-line @next/next/no-img-element -- optimised WebP from the API
                         <img
-                          src={category.image_url}
+                          src={category.image_thumb_url || category.image_url}
                           alt=""
                           loading="lazy"
                           className="size-full rounded-full object-cover transition duration-500 group-hover:scale-105"
@@ -134,7 +135,7 @@ export default async function HomePage() {
         linkLabel={t.viewAll}
       />
 
-      <section className="relative overflow-hidden bg-[linear-gradient(160deg,var(--color-teal-100),var(--color-ivory-100)_70%)]">
+      <section className="relative overflow-hidden bg-[linear-gradient(160deg,var(--color-teal-100),var(--color-ivory-100)_70%)] [content-visibility:auto] [contain-intrinsic-size:auto_900px]">
         <FallingPetals />
         <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-8 sm:px-6 md:grid-cols-2 lg:py-10">
           <div className="relative mx-auto w-full max-w-md">
@@ -178,7 +179,8 @@ export default async function HomePage() {
       />
 
       {home.reviews.length > 0 && (
-        <section className="relative overflow-hidden bg-navy-950 text-ivory-50">
+        <Suspense>
+        <section className="relative overflow-hidden bg-navy-950 text-ivory-50 [content-visibility:auto] [contain-intrinsic-size:auto_900px]">
           {/* soft lotus glow + faint grid, like a stage behind the cards */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_55%_at_50%_60%,rgba(209,30,88,0.28),transparent_70%)]" aria-hidden />
           <div className="absolute inset-0 opacity-[0.06] [background-image:linear-gradient(white_1px,transparent_1px),linear-gradient(90deg,white_1px,transparent_1px)] [background-size:44px_44px]" aria-hidden />
@@ -206,10 +208,13 @@ export default async function HomePage() {
             )}
           </div>
         </section>
+        </Suspense>
       )}
 
       {(store.facebook_url || store.instagram_url) && (
+        <Suspense>
         <SocialSection store={store} products={[...home.new_arrivals, ...home.featured, ...home.best_sellers].filter((product, index, all) => all.findIndex((p) => p.id === product.id) === index)} t={t} lang={lang} />
+        </Suspense>
       )}
     </>
   );
@@ -226,8 +231,11 @@ function ProductSection({
 }) {
   if (!products?.length) return null;
 
+  // Suspense: each rail hydrates as its own small task instead of one long one.
+  // content-visibility: the browser skips layout and paint until the rail is near the screen.
   return (
-    <section className={tone === "band" ? "bg-white/60" : undefined}>
+    <Suspense>
+    <section className={`[content-visibility:auto] [contain-intrinsic-size:auto_900px] ${tone === "band" ? "bg-white/60" : ""}`}>
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
         <SectionHeading title={title} />
         <div className="grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-5 md:grid-cols-4 lg:gap-x-6">
@@ -243,5 +251,6 @@ function ProductSection({
         {href && <ViewAllButton href={href}>{linkLabel}</ViewAllButton>}
       </div>
     </section>
+    </Suspense>
   );
 }

@@ -69,7 +69,28 @@ class ImageProcessor
     public function delete(?string $path): void
     {
         if ($path !== null) {
-            Storage::disk('public')->delete($path);
+            Storage::disk('public')->delete([$path, $this->thumbnailPath($path)]);
         }
+    }
+
+    /**
+     * Small copy of a single-size image, stored next to it as "<name>_sm.webp"
+     * (category circles on the home page). Safe to call again.
+     */
+    public function storeThumbnail(string $path, int $maxWidth = 240): void
+    {
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists($path)) {
+            return;
+        }
+
+        $encoded = (new ImageManager(new Driver))->decodePath($disk->path($path))->scaleDown(width: $maxWidth)->encode(new WebpEncoder(80, strip: true));
+        $disk->put($this->thumbnailPath($path), $encoded->toString());
+    }
+
+    public function thumbnailPath(string $path): string
+    {
+        return preg_replace('/\.webp$/', '', $path).'_sm.webp';
     }
 }

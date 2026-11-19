@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crop, Eraser, ImageUp, RotateCcw, Wand2 } from "lucide-react";
-import { alphaBounds, findPieces, foregroundMask } from "@/lib/cutout";
+import { alphaBounds, findObjects, findPieces, foregroundMask } from "@/lib/cutout";
 import { Button, Modal, Spinner } from "@/components/admin/ui";
 
 const MAX_SIDE = 1100;
@@ -13,7 +13,7 @@ const MAX_SIDE = 1100;
  * cleans up leftovers. `onDone(file)` receives a transparent, tightly cropped PNG.
  * Mounted by the parent only while open, so it always starts fresh.
  */
-export default function CutoutTool({ open, onClose, onDone, saving, images = [] }) {
+export default function CutoutTool({ open, onClose, onDone, saving, images = [], type = "earring" }) {
   const canvasRef = useRef(null);
   const fileRef = useRef(null);
   const state = useRef({ w: 0, h: 0, rgba: null, mask: null, pieces: [], erased: null });
@@ -72,7 +72,8 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [] 
       ctx.drawImage(bitmap, 0, 0, w, h);
       const rgba = ctx.getImageData(0, 0, w, h).data;
       const mask = await foregroundMask(scratch);
-      const pieces = findPieces(rgba, mask, w, h);
+      // earrings: one earring off its stand; anything else: each separate object
+      const pieces = type === "earring" ? findPieces(rgba, mask, w, h) : findObjects(mask, w, h);
       state.current = { w, h, rgba, mask, pieces, erased: new Uint8Array(w * h) };
       const canvas = canvasRef.current;
       canvas.width = w;
@@ -261,7 +262,9 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [] 
               <RotateCcw className="size-4" /> Reset
             </Button>
           </div>
-          <p className="text-xs text-ink-400">For earrings keep ONE earring only (the other ear is mirrored in the shop). <strong>Keep area</strong>: drag a box around the earring you want. <strong>Eraser</strong>: rub out leftovers such as the stand or a leaf.</p>
+          <p className="text-xs text-ink-400">
+            {type === "earring" ? "Keep ONE earring only (the other ear is mirrored in the shop)." : "Each Piece is one separate object in the photo. Keep the piece that is the product itself."} <strong>Keep area</strong>: drag a box around what you want. <strong>Eraser</strong>: rub out leftovers such as the stand or a leaf.
+          </p>
         </div>
 
         {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

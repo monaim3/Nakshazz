@@ -21,7 +21,7 @@ const SIZE_HELP = {
 
 const PHOTO_HELP = {
   earring: "ONE earring, straight from the front, hook at the top, background removed. The Make from a photo button cuts it out automatically. The other ear is mirrored in the shop.",
-  necklace: "The whole necklace from the front, the chain ends at the top corners, background removed. The Make from a photo button does it automatically (choose Everything).",
+  necklace: "The whole necklace from the front, the chain ends at the top corners, background removed. The Make from a photo button does it automatically; keep the piece that is the necklace.",
   nose: "The nose pin from the front, background removed. The Make from a photo button does it automatically.",
 };
 
@@ -114,7 +114,7 @@ export default function TryOnManager({ product }) {
             )}
           </div>
           <input ref={inputRef} type="file" accept="image/png,image/webp" hidden onChange={(event) => onFile(event.target.files?.[0])} />
-          {cutoutOpen && <CutoutTool open images={product.images || []} onClose={() => setCutoutOpen(false)} saving={uploadState.isLoading} onDone={async (file) => (await onFile(file)) && setCutoutOpen(false)} />}
+          {cutoutOpen && <CutoutTool open type={type || "earring"} images={product.images || []} onClose={() => setCutoutOpen(false)} saving={uploadState.isLoading} onDone={async (file) => (await onFile(file)) && setCutoutOpen(false)} />}
         </div>
       </div>
     </Card>

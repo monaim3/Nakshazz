@@ -264,6 +264,52 @@ export function findPieces(rgba, mask, w, h) {
     });
 }
 
+/**
+ * Plain split for necklaces and nose pins: every separate object in the cut-out is one
+ * piece (the necklace, each earring lying next to it, a prop leaf...), largest first.
+ * No stand logic, so a long thin chain stays whole.
+ */
+export function findObjects(mask, w, h) {
+  const n = w * h;
+  const solid = new Uint8Array(n);
+  for (let p = 0; p < n; p++) if (mask[p] >= 96) solid[p] = 1;
+  // small bridge so a chain with faint gaps between beads is not broken up
+  const grown = dilate(solid, w, h, Math.max(2, Math.round(Math.max(w, h) / 220)));
+  const labels = new Int32Array(n);
+  const sizes = [0];
+  const stack = [];
+  for (let start = 0; start < n; start++) {
+    if (!grown[start] || labels[start]) continue;
+    const id = sizes.length;
+    let size = 0;
+    labels[start] = id;
+    stack.push(start);
+    while (stack.length) {
+      const p = stack.pop();
+      size += solid[p];
+      const x = p % w;
+      for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w]) {
+        if (q >= 0 && q < n && grown[q] && !labels[q]) {
+          labels[q] = id;
+          stack.push(q);
+        }
+      }
+    }
+    sizes.push(size);
+  }
+  const biggest = Math.max(...sizes);
+  return sizes
+    .map((size, id) => ({ id, size }))
+    .filter((piece) => piece.id > 0 && piece.size > biggest * 0.04)
+    .sort((a, b) => b.size - a.size)
+    .slice(0, 5)
+    .map((piece) => {
+      const keep = new Uint8Array(n);
+      for (let p = 0; p < n; p++) if (labels[p] === piece.id && solid[p]) keep[p] = 1;
+      return keep;
+    });
+}
+
 /** Bounding box of visible pixels (alpha > 24) or null when empty. */
 export function alphaBounds(alpha, w, h) {
   let x0 = w;

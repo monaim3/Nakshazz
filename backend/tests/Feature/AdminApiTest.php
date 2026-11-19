@@ -44,6 +44,14 @@ class AdminApiTest extends TestCase
     }
 
     #[Test]
+    public function a_guest_opening_an_admin_address_in_a_browser_tab_gets_401_not_a_crash(): void
+    {
+        $this->get('/api/v1/admin/coupons', ['Accept' => 'text/html'])
+            ->assertUnauthorized()
+            ->assertExactJson(['message' => 'Unauthenticated.']);
+    }
+
+    #[Test]
     public function owner_logs_in_with_session_cookie(): void
     {
         $this->withHeader('Origin', 'http://localhost:3000')

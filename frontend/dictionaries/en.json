@@ -121,7 +121,7 @@
     "all": "All",
     "search": "Search",
     "searchPlaceholder": "Search jewellery…",
-    "price": "Price (৳)",
+    "price": "Price range",
     "min": "Min",
     "max": "Max",
     "go": "Go",
@@ -144,7 +144,10 @@
     "pagination": "Pages",
     "previous": "Previous page",
     "next": "Next page",
-    "loadError": "Could not load products. Please refresh the page."
+    "loadError": "Could not load products. Please refresh the page.",
+    "colour": "Colour",
+    "availability": "Availability",
+    "onSale": "On sale"
   },
   "productPage": {
     "reviewsCount": ":count reviews",

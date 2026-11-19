@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ProductCatalog
 {
     /** @var array<string, string> sort key => description */
+    /** Variant option names treated as colour / metal for the colour filter. */
+    public const COLOR_OPTION_KEYS = ['Color', 'Colour', 'Metal', 'Finish'];
+
     public const SORTS = [
         'newest' => 'Newest first',
         'price' => 'Price: low to high',
@@ -76,6 +79,22 @@ class ProductCatalog
                     $v->where('price', '<=', $filters['max_price']);
                 }
             });
+        }
+
+        if (! empty($filters['color'])) {
+            $colors = array_slice(array_filter(array_map('trim', explode(',', (string) $filters['color']))), 0, 10);
+            $query->whereHas('variants', function (Builder $v) use ($colors) {
+                $v->where('is_active', true)->where(function (Builder $any) use ($colors) {
+                    foreach (self::COLOR_OPTION_KEYS as $key) {
+                        $any->orWhereIn("options->{$key}", $colors);
+                    }
+                });
+            });
+        }
+
+        if (! empty($filters['on_sale'])) {
+            $query->whereHas('variants', fn (Builder $v) => $v->where('is_active', true)
+                ->whereNotNull('compare_at_price')->whereColumn('compare_at_price', '>', 'price'));
         }
 
         if (! empty($filters['featured'])) {
@@ -145,6 +164,59 @@ class ProductCatalog
      *
      * @return Builder<Product>
      */
+    /**
+     * Filter facets for the shop sidebar: price bounds, colours with product counts and how
+     * many products are on sale. Scoped to a category when given.
+     *
+     * @return array{price: array{min: int, max: int}, colors: list<array{value: string, count: int}>, on_sale: int}
+     */
+    public function facets(?string $categorySlug = null): array
+    {
+        $products = Product::query()
+            ->published()
+            ->whereHas('variants', fn (Builder $v) => $v->where('is_active', true));
+
+        if ($categorySlug) {
+            $category = Category::query()->active()->where('slug', $categorySlug)->first(['id']);
+            $categoryIds = $category === null
+                ? [0]
+                : Category::query()->active()->where('parent_id', $category->id)->pluck('id')->push($category->id)->all();
+            $products->whereIn('products.category_id', $categoryIds);
+        }
+
+        $variants = ProductVariant::query()
+            ->where('is_active', true)
+            ->whereIn('product_id', $products->select('products.id'))
+            ->get(['product_id', 'price', 'compare_at_price', 'options']);
+
+        $colors = [];
+        foreach ($variants as $variant) {
+            foreach (self::COLOR_OPTION_KEYS as $key) {
+                $value = $variant->options[$key] ?? null;
+                if (is_string($value) && $value !== '') {
+                    $colors[$value][$variant->product_id] = true;
+                }
+            }
+        }
+
+        return [
+            'price' => [
+                'min' => (int) floor((float) ($variants->min('price') ?? 0)),
+                'max' => (int) ceil((float) ($variants->max('price') ?? 0)),
+            ],
+            'colors' => collect($colors)
+                ->map(fn (array $productIds, string $value) => ['value' => $value, 'count' => count($productIds)])
+                ->sortByDesc('count')
+                ->values()
+                ->all(),
+            'on_sale' => $variants
+                ->filter(fn (ProductVariant $v) => $v->compare_at_price !== null && (float) $v->compare_at_price > (float) $v->price)
+                ->pluck('product_id')
+                ->unique()
+                ->count(),
+        ];
+    }
+
     private function baseQuery(): Builder
     {
         return Product::query()

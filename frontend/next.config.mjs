@@ -8,6 +8,12 @@ const nextConfig = {
   // already optimised WebP from the API and small brand assets.
   images: { unoptimized: true },
   cacheComponents: true,
+  // Shared hosting throttles bursts of API requests: prerender gently, retry failed pages.
+  experimental: {
+    cpus: 2,
+    staticGenerationMaxConcurrency: 4,
+    staticGenerationRetryCount: 3,
+  },
   partialPrefetching: true,
   turbopack: {
     rules: {

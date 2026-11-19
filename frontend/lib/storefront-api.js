@@ -7,8 +7,20 @@ import { cacheLife, cacheTag } from "next/cache";
  */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
 
+/** fetch with retries: the shared host occasionally drops a connection under load. */
+async function fetchWithRetry(url, attempts = 4) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+    } catch (error) {
+      if (attempt >= attempts) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+    }
+  }
+}
+
 async function apiGet(path) {
-  const response = await fetch(`${API_URL}${path}`, { headers: { Accept: "application/json" } });
+  const response = await fetchWithRetry(`${API_URL}${path}`);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`API ${response.status} for ${path}`);
   return (await response.json()).data;
@@ -51,7 +63,7 @@ export async function getPage(slug) {
 
 /** Full paginated response ({ data, meta }) for the listing endpoints. */
 async function apiGetPage(path) {
-  const response = await fetch(`${API_URL}${path}`, { headers: { Accept: "application/json" } });
+  const response = await fetchWithRetry(`${API_URL}${path}`);
   if (!response.ok) throw new Error(`API ${response.status} for ${path}`);
   return response.json();
 }
@@ -80,4 +92,12 @@ export async function getProductReviews(slug) {
   cacheLife("hours");
   cacheTag("reviews", `product:${slug}`);
   return (await apiGet(`/products/${encodeURIComponent(slug)}/reviews`)) || [];
+}
+
+/** Sidebar facets: price bounds, colours with counts, on-sale count. */
+export async function getFacets(category) {
+  "use cache";
+  cacheLife("minutes");
+  cacheTag("products");
+  return apiGet(`/products/facets${category ? `?category=${encodeURIComponent(category)}` : ""}`);
 }

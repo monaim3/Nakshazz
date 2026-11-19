@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Button, Checkbox, Input } from "@/components/admin/ui";
+import { Button, Checkbox, Input, PasswordInput } from "@/components/admin/ui";
 import { useLoginMutation } from "@/store/admin/api";
 import { ensureCsrfCookie } from "@/lib/admin-api-client";
 
@@ -48,7 +48,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
       <Input label="Email" type="email" autoComplete="username" autoFocus error={errors.email?.message} {...register("email")} />
-      <Input label="Password" type="password" autoComplete="current-password" error={errors.password?.message} {...register("password")} />
+      <PasswordInput label="Password" autoComplete="current-password" error={errors.password?.message} {...register("password")} />
       <Checkbox label="Keep me signed in on this device" {...register("remember")} />
 
       {errors.root && (

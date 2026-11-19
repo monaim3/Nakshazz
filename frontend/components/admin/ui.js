@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, forwardRef, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Eye, EyeOff, Loader2, X } from "lucide-react";
 import { humanize } from "@/lib/format";
 
 export function cx(...classes) {
@@ -84,6 +84,37 @@ export const Input = forwardRef(function Input({ label, error, hint, required, c
         className={cx(fieldBase, "h-10", error && "ring-red-400")}
         {...props}
       />
+    </Field>
+  );
+});
+
+/** Password field with a show/hide (eye) toggle. */
+export const PasswordInput = forwardRef(function PasswordInput({ label, error, hint, required, className, id, ...props }, ref) {
+  const autoId = useId();
+  const inputId = id || autoId;
+  const [visible, setVisible] = useState(false);
+  return (
+    <Field label={label} error={error} hint={hint} required={required} className={className} htmlFor={inputId}>
+      <div className="relative">
+        <input
+          ref={ref}
+          id={inputId}
+          type={visible ? "text" : "password"}
+          aria-invalid={error ? true : undefined}
+          className={cx(fieldBase, "h-10 pr-11", error && "ring-red-400")}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={() => setVisible((value) => !value)}
+          className="absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg text-ink-400 transition hover:text-ink-800"
+          aria-label={visible ? "Hide password" : "Show password"}
+          aria-pressed={visible}
+          aria-controls={inputId}
+        >
+          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+      </div>
     </Field>
   );
 });

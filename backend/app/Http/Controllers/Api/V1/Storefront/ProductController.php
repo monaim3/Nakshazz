@@ -11,6 +11,7 @@ use App\Http\Resources\Storefront\ReviewResource;
 use App\Models\Product;
 use App\Services\ProductCatalog;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ProductController extends Controller
@@ -34,6 +35,16 @@ class ProductController extends Controller
             'reviews' => ReviewResource::collection($reviews),
             'related' => ProductCardResource::collection($catalog->related($product)),
         ]]);
+    }
+
+    /**
+     * Sidebar facets: price bounds, colours and on-sale count (optionally per category).
+     */
+    public function facets(Request $request, ProductCatalog $catalog): JsonResponse
+    {
+        $category = $request->string('category')->limit(120, '')->toString();
+
+        return response()->json(['data' => $catalog->facets($category !== '' ? $category : null)]);
     }
 
     public function reviews(string $slug): AnonymousResourceCollection

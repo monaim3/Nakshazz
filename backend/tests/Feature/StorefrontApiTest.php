@@ -215,6 +215,37 @@ class StorefrontApiTest extends TestCase
     /**
      * @param  array<string, mixed>  $attributes
      */
+    #[Test]
+    public function products_filter_by_colour_and_sale_and_facets_report_bounds(): void
+    {
+        $golden = $this->product(['name' => 'Golden Drops'], price: '300.00');
+        $golden->variants->first()->update(['options' => ['Color' => 'Golden']]);
+        $silver = $this->product(['name' => 'Silver Drops'], price: '700.00');
+        $silver->variants->first()->update(['options' => ['Color' => 'Silver'], 'compare_at_price' => '900.00']);
+
+        $this->getJson('/api/v1/products?color=Silver')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Silver Drops');
+
+        $this->getJson('/api/v1/products?max_price=500')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Golden Drops');
+
+        $this->getJson('/api/v1/products?on_sale=1')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.name', 'Silver Drops');
+
+        $this->getJson('/api/v1/products/facets')
+            ->assertOk()
+            ->assertJsonPath('data.price.min', 300)
+            ->assertJsonPath('data.price.max', 700)
+            ->assertJsonPath('data.on_sale', 1)
+            ->assertJsonCount(2, 'data.colors');
+    }
+
     private function product(array $attributes = [], string $price = '1000.00', int $stock = 10, bool $draft = false): Product
     {
         $factory = Product::factory()->state($attributes);

@@ -14,6 +14,7 @@ Route::prefix('v1')->name('v1.')->middleware('throttle:storefront')->group(funct
         Route::get('home', Storefront\HomeController::class)->name('home');
         Route::get('categories', [Storefront\CategoryController::class, 'index'])->name('categories.index');
         Route::get('categories/{slug}', [Storefront\CategoryController::class, 'show'])->name('categories.show');
+        Route::get('products/facets', [Storefront\ProductController::class, 'facets'])->name('products.facets');
         Route::get('products', [Storefront\ProductController::class, 'index'])->name('products.index');
         Route::get('products/{slug}', [Storefront\ProductController::class, 'show'])->name('products.show');
         Route::get('products/{slug}/reviews', [Storefront\ProductController::class, 'reviews'])->name('products.reviews');

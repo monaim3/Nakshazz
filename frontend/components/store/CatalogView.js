@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, SearchX } from "lucide-react";
 import { localePath, localizeDigits } from "@/lib/i18n";
-import { getProducts } from "@/lib/storefront-api";
+import { getFacets, getProducts } from "@/lib/storefront-api";
 import CatalogToolbar from "./CatalogToolbar";
 import ProductCard from "./ProductCard";
 
 const PER_PAGE = 12;
-const KEYS = ["q", "sort", "min_price", "max_price", "in_stock", "featured", "page"];
+const KEYS = ["q", "sort", "min_price", "max_price", "in_stock", "on_sale", "featured", "color", "page"];
 
 /** Only known, sane filter values reach the API (anything else is dropped). */
 function cleanQuery(raw) {
@@ -15,7 +15,12 @@ function cleanQuery(raw) {
     const value = Array.isArray(raw[key]) ? raw[key][0] : raw[key];
     if (value === undefined || value === "") continue;
     if (["min_price", "max_price", "page"].includes(key) && !/^\d{1,7}$/.test(value)) continue;
-    if (["in_stock", "featured"].includes(key)) {
+    if (key === "color") {
+      const colors = String(value).split(",").map((c) => c.trim()).filter((c) => /^[\p{L}\p{N} &-]{1,30}$/u.test(c)).slice(0, 10);
+      if (colors.length) query.color = colors.join(",");
+      continue;
+    }
+    if (["in_stock", "on_sale", "featured"].includes(key)) {
       if (value === "1" || value === "true") query[key] = 1;
       continue;
     }
@@ -32,7 +37,10 @@ function cleanQuery(raw) {
  */
 export default async function CatalogView({ searchParams, category = null, lang, dict, basePath }) {
   const query = cleanQuery(await searchParams);
-  const result = await getProducts({ ...query, category: category?.slug, per_page: PER_PAGE }).catch(() => null);
+  const [result, facets] = await Promise.all([
+    getProducts({ ...query, category: category?.slug, per_page: PER_PAGE }).catch(() => null),
+    getFacets(category?.slug).catch(() => null),
+  ]);
   const t = dict.shop;
 
   if (!result) {
@@ -48,7 +56,7 @@ export default async function CatalogView({ searchParams, category = null, lang,
 
   return (
     <div className="lg:grid lg:grid-cols-[230px_1fr] lg:gap-x-10">
-      <CatalogToolbar query={query} total={meta.total} lang={lang} t={t} />
+      <CatalogToolbar query={query} total={meta.total} facets={facets} lang={lang} t={t} />
 
       <div className="pt-6 lg:col-start-2 lg:row-start-2">
         {products.length === 0 ? (

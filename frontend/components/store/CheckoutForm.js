@@ -196,8 +196,7 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
       <div className="space-y-10">
         {/* 1. Contact */}
         <fieldset>
-          <legend className="mb-5 flex items-center gap-3 font-display text-2xl text-navy-900">
-            <Step n={n(1)} /> {t.contact}
+          <legend className="mb-5 font-display text-2xl text-navy-900"> {t.contact}
           </legend>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -226,8 +225,7 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
 
         {/* 2. Delivery */}
         <fieldset>
-          <legend className="mb-5 flex items-center gap-3 font-display text-2xl text-navy-900">
-            <Step n={n(2)} /> {t.delivery}
+          <legend className="mb-5 font-display text-2xl text-navy-900"> {t.delivery}
           </legend>
           <div className="grid gap-3 sm:grid-cols-2" role="radiogroup" aria-label={t.zone}>
             {zones.map((item) => (
@@ -273,8 +271,7 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
 
         {/* 3. Payment */}
         <fieldset>
-          <legend className="mb-5 flex items-center gap-3 font-display text-2xl text-navy-900">
-            <Step n={n(3)} /> {t.payment}
+          <legend className="mb-5 font-display text-2xl text-navy-900"> {t.payment}
           </legend>
           <div className="grid gap-3 sm:grid-cols-2">
             {methods.includes("cod") && (
@@ -434,9 +431,6 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
   );
 }
 
-function Step({ n }) {
-  return <span className="flex size-8 items-center justify-center rounded-full bg-navy-900 font-sans text-sm text-white">{n}</span>;
-}
 
 function Row({ label, value, accent = false }) {
   return (

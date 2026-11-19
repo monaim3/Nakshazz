@@ -4,6 +4,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
 import { localizeDigits } from "@/lib/i18n";
+import { swatchFor } from "@/lib/swatches";
+import PriceRange from "./PriceRange";
 
 const SORTS = ["newest", "popular", "price", "-price", "name"];
 
@@ -12,14 +14,12 @@ const SORTS = ["newest", "popular", "price", "-price", "name"];
  * (shareable, back button works, crawlable); changing a control navigates to the new URL
  * and the server re-renders the product grid.
  */
-export default function CatalogToolbar({ query, total, lang, t }) {
+export default function CatalogToolbar({ query, total, facets, lang, t }) {
   const router = useRouter();
   const pathname = usePathname();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState(query.q || "");
-  const [minPrice, setMinPrice] = useState(query.min_price || "");
-  const [maxPrice, setMaxPrice] = useState(query.max_price || "");
 
   function apply(changes) {
     const next = new URLSearchParams();
@@ -31,7 +31,9 @@ export default function CatalogToolbar({ query, total, lang, t }) {
     startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false }));
   }
 
-  const activeFilters = [query.q, query.min_price, query.max_price, query.in_stock].filter(Boolean).length;
+  const selectedColors = query.color ? query.color.split(",") : [];
+  const colors = facets?.colors || [];
+  const activeFilters = [query.q, query.min_price || query.max_price, query.in_stock, query.on_sale, ...selectedColors].filter(Boolean).length;
   const count = localizeDigits(String(total), lang);
 
   const filters = (
@@ -52,38 +54,56 @@ export default function CatalogToolbar({ query, total, lang, t }) {
         </div>
       </form>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          apply({ min_price: minPrice, max_price: maxPrice });
-          setOpen(false);
-        }}
-      >
-        <p className="text-xs font-medium tracking-[0.18em] text-navy-900 uppercase">{t.price}</p>
-        <div className="mt-2 flex items-center gap-2">
-          <input type="number" min="0" inputMode="numeric" value={minPrice} onChange={(event) => setMinPrice(event.target.value)} placeholder={t.min} aria-label={t.min} className="h-11 w-full rounded-full border border-ivory-300 bg-white px-4 text-sm outline-none focus:border-navy-900" />
-          <span className="text-ink/40">–</span>
-          <input type="number" min="0" inputMode="numeric" value={maxPrice} onChange={(event) => setMaxPrice(event.target.value)} placeholder={t.max} aria-label={t.max} className="h-11 w-full rounded-full border border-ivory-300 bg-white px-4 text-sm outline-none focus:border-navy-900" />
-          <button type="submit" className="h-11 shrink-0 rounded-full bg-navy-900 px-4 text-sm font-medium text-white">
-            {t.go}
-          </button>
-        </div>
-      </form>
+      {facets?.price && facets.price.max > facets.price.min && (
+        <PriceRange
+          key={`${query.min_price || ""}-${query.max_price || ""}-${facets.price.min}-${facets.price.max}`}
+          min={facets.price.min}
+          max={facets.price.max}
+          valueMin={query.min_price ? Number(query.min_price) : undefined}
+          valueMax={query.max_price ? Number(query.max_price) : undefined}
+          onCommit={(low, high) => apply({ min_price: low, max_price: high })}
+          lang={lang}
+          t={t}
+        />
+      )}
 
-      <label className="flex cursor-pointer items-center justify-between gap-3">
-        <span className="text-sm text-navy-900">{t.inStockOnly}</span>
-        <input type="checkbox" checked={Boolean(query.in_stock)} onChange={(event) => apply({ in_stock: event.target.checked ? 1 : undefined })} className="peer sr-only" />
-        <span className="relative h-6 w-11 rounded-full bg-ivory-300 transition peer-checked:bg-navy-900 after:absolute after:top-0.5 after:left-0.5 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-marigold-400" aria-hidden />
-      </label>
+      {colors.length > 0 && (
+        <div>
+          <p className="text-xs font-medium tracking-[0.18em] text-navy-900 uppercase">{t.colour}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {colors.map((color) => {
+              const on = selectedColors.includes(color.value);
+              const swatch = swatchFor(color.value);
+              return (
+                <button
+                  key={color.value}
+                  type="button"
+                  onClick={() => apply({ color: (on ? selectedColors.filter((c) => c !== color.value) : [...selectedColors, color.value]).join(",") || undefined })}
+                  aria-pressed={on}
+                  className={`flex items-center gap-2 rounded-full border py-1 pr-3 pl-1 text-sm transition ${on ? "border-navy-900 bg-navy-900 text-white" : "border-ivory-300 bg-white text-navy-900 hover:border-navy-900"}`}
+                >
+                  <span className="size-6 rounded-full ring-1 ring-black/10" style={{ background: swatch || "var(--color-ivory-200)" }} />
+                  {color.value}
+                  <span className={on ? "text-white/60" : "text-ink/40"}>{localizeDigits(String(color.count), lang)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <p className="text-xs font-medium tracking-[0.18em] text-navy-900 uppercase">{t.availability}</p>
+        <Toggle label={t.inStockOnly} checked={Boolean(query.in_stock)} onChange={(checked) => apply({ in_stock: checked ? 1 : undefined })} />
+        {(facets?.on_sale > 0 || query.on_sale) && <Toggle label={t.onSale} checked={Boolean(query.on_sale)} onChange={(checked) => apply({ on_sale: checked ? 1 : undefined })} />}
+      </div>
 
       {activeFilters > 0 && (
         <button
           type="button"
           onClick={() => {
             setSearch("");
-            setMinPrice("");
-            setMaxPrice("");
-            apply({ q: undefined, min_price: undefined, max_price: undefined, in_stock: undefined });
+            apply({ q: undefined, min_price: undefined, max_price: undefined, in_stock: undefined, on_sale: undefined, color: undefined });
             setOpen(false);
           }}
           className="text-sm text-lotus-600 underline-offset-4 hover:underline"
@@ -142,5 +162,15 @@ export default function CatalogToolbar({ query, total, lang, t }) {
         </div>
       )}
     </>
+  );
+}
+
+function Toggle({ label, checked, onChange }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-3">
+      <span className="text-sm text-navy-900">{label}</span>
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="peer sr-only" />
+      <span className="relative h-6 w-11 shrink-0 rounded-full bg-ivory-300 transition peer-checked:bg-navy-900 peer-focus-visible:outline-2 peer-focus-visible:outline-marigold-400 after:absolute after:top-0.5 after:left-0.5 after:size-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" aria-hidden />
+    </label>
   );
 }

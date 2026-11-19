@@ -5,7 +5,7 @@ import { Plus, UserCog } from "lucide-react";
 import { useMeQuery } from "@/store/admin/api";
 import { useSaveUserMutation, useUsersQuery } from "@/store/admin/ownerApi";
 import { formatDateTime } from "@/lib/format";
-import { Badge, Button, Card, Checkbox, EmptyState, ErrorBlock, Input, LoadingBlock, Modal, PageHeader, Select, Table, useToast } from "@/components/admin/ui";
+import { Badge, Button, Card, Checkbox, EmptyState, ErrorBlock, Input, LoadingBlock, Modal, PasswordInput, PageHeader, Select, Table, useToast } from "@/components/admin/ui";
 
 export default function StaffManager() {
   const { data, error, isLoading, refetch } = useUsersQuery();
@@ -114,10 +114,9 @@ function UserModal({ user, isSelf, onClose }) {
           disabled={isSelf}
         />
         {isSelf && <input type="hidden" name="role" value={user.role} />}
-        <Input
+        <PasswordInput
           name="password"
           label={user ? "New password (optional)" : "Password"}
-          type="password"
           autoComplete="new-password"
           required={!user}
           hint="At least 10 characters with letters and numbers."

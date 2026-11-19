@@ -8,7 +8,14 @@ import { Card, cx, Spinner, useToast } from "@/components/admin/ui";
 const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPTED = ["image/jpeg", "image/png", "image/webp"];
 
+/** "Golden", "Silver / Large", or the SKU when a variant has no options. */
+function variantName(variant) {
+  const options = Object.values(variant.options || {});
+  return options.length ? options.join(" / ") : variant.title || variant.sku;
+}
+
 export default function ImageManager({ product }) {
+  const variants = product.variants || [];
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
   const [upload, uploadState] = useUploadProductImagesMutation();
@@ -44,6 +51,17 @@ export default function ImageManager({ product }) {
     await updateImage({ id: image.id, productId: product.id, alt }).unwrap().catch((error) => notify(error.message, "error"));
   }
 
+  async function saveVariant(image, value) {
+    const variantId = value ? Number(value) : null;
+    if (variantId === (image.variant_id ?? null)) return;
+    try {
+      await updateImage({ id: image.id, productId: product.id, variant_id: variantId }).unwrap();
+      notify(variantId ? "Photo linked to that colour." : "Photo shown for all colours.");
+    } catch (error) {
+      notify(error.message, "error");
+    }
+  }
+
   async function remove(image) {
     if (!window.confirm("Delete this photo?")) return;
     await deleteImage({ id: image.id, productId: product.id }).unwrap().catch((error) => notify(error.message, "error"));
@@ -68,6 +86,22 @@ export default function ImageManager({ product }) {
               </button>
             </div>
             <figcaption>
+              {variants.length > 1 && (
+                <select
+                  value={image.variant_id ?? ""}
+                  onChange={(event) => saveVariant(image, event.target.value)}
+                  aria-label="Colour / variant shown in this photo"
+                  title="Which colour this photo shows. Customers see it when they pick that colour."
+                  className="w-full border-t border-ink-100 bg-cream-50 px-2 py-1.5 text-xs text-ink-700 focus:outline-none"
+                >
+                  <option value="">Shows: all colours</option>
+                  {variants.map((variant) => (
+                    <option key={variant.id} value={variant.id}>
+                      Shows: {variantName(variant)}
+                    </option>
+                  ))}
+                </select>
+              )}
               <input
                 defaultValue={image.alt || ""}
                 onBlur={(event) => saveAlt(image, event.target.value)}
@@ -103,7 +137,7 @@ export default function ImageManager({ product }) {
         </button>
       </div>
       <input ref={inputRef} type="file" accept={ACCEPTED.join(",")} multiple hidden onChange={(event) => handleFiles(event.target.files)} />
-      <p className="mt-3 text-xs text-ink-400">Photos are converted to fast-loading WebP in three sizes automatically. Square photos on a plain background look best.</p>
+      <p className="mt-3 text-xs text-ink-400">Photos are converted to fast-loading WebP in three sizes automatically. Square photos on a plain background look best. Link a photo to a colour (&ldquo;Shows: Silver&rdquo;) and the shop switches to it when a customer picks that colour.</p>
     </Card>
   );
 }

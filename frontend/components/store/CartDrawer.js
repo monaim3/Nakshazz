@@ -117,13 +117,13 @@ export default function CartDrawer({ lang, t }) {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           {href ? (
-                            <Link href={href} onClick={() => setOpen(false)} className="font-display text-lg leading-snug text-navy-900 hover:text-lotus-600">
+                            <Link href={href} onClick={() => setOpen(false)} className="font-display text-xl leading-snug font-semibold text-navy-900 hover:text-lotus-600">
                               {info.product_name}
                             </Link>
                           ) : (
                             <p className="h-5 w-32 animate-pulse rounded bg-ivory-200" />
                           )}
-                          {info?.variant_title && <p className="text-xs text-ink/55">{info.variant_title}</p>}
+                          {info?.variant_title && <p className="mt-0.5 text-xs font-medium text-ink/65">{info.variant_title}</p>}
                         </div>
                         <button type="button" onClick={() => removeFromCart(line.variantId)} className="rounded-full p-1.5 text-ink/40 transition hover:bg-lotus-50 hover:text-lotus-600" aria-label={t.remove}>
                           <Trash2 className="size-4" />

@@ -104,7 +104,7 @@ async function ProductContent({ params }) {
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
-        <ProductGallery images={images} name={product.name} />
+        <ProductGallery images={images} name={product.name} productId={product.id} />
 
         <div>
           {product.category && (

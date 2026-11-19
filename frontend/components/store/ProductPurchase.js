@@ -61,6 +61,8 @@ export default function ProductPurchase({ product, lang, t }) {
           onChange={(id) => {
             setVariantId(id);
             setQuantity(1);
+            // tell the gallery (a sibling component) to show this colour's photo
+            window.dispatchEvent(new CustomEvent("nakshazz-variant-change", { detail: { productId: product.id, variantId: id } }));
           }}
         />
       )}

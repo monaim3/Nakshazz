@@ -151,7 +151,7 @@ export default function QuickView({ slug, open, onClose, lang, t }) {
                   setQuantity(1);
                   // jump to the variant's own photo if it has one
                   const photo = images.findIndex((item) => item.variant_id === id);
-                  if (photo >= 0) setImageIndex(photo);
+                  setImageIndex(photo >= 0 ? photo : Math.max(0, images.findIndex((item) => !item.variant_id)));
                 }}
               />
             )}

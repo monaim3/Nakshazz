@@ -5,8 +5,9 @@ use Illuminate\Support\Facades\Route;
 
 /*
 | Public storefront API. Admin routes live in routes/admin.php.
+| "storefront" lets in only our own website (see EnsureStorefrontCaller).
 */
-Route::prefix('v1')->name('v1.')->middleware('throttle:storefront')->group(function () {
+Route::prefix('v1')->name('v1.')->middleware(['storefront', 'throttle:storefront'])->group(function () {
 
     // Read-only, cacheable by browsers/CDN for a short time.
     Route::middleware('cache.headers:public;max_age=60;etag')->group(function () {

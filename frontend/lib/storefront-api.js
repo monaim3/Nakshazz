@@ -7,11 +7,15 @@ import { cacheLife, cacheTag } from "next/cache";
  */
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
 
+// The API only answers our own website: this server proves itself with a shared key
+// (server-only env, never sent to browsers; browsers are recognised by the page's origin).
+const HEADERS = { Accept: "application/json", ...(process.env.STOREFRONT_API_KEY ? { "X-Storefront-Key": process.env.STOREFRONT_API_KEY } : {}) };
+
 /** fetch with retries: the shared host occasionally drops a connection under load. */
 async function fetchWithRetry(url, attempts = 4) {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+      return await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(15000) });
     } catch (error) {
       if (attempt >= attempts) throw error;
       await new Promise((resolve) => setTimeout(resolve, 500 * attempt));

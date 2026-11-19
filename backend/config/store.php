@@ -14,6 +14,12 @@ return [
     */
     'revalidate_secret' => env('REVALIDATE_SECRET'),
 
+    /*
+    | Shared key the storefront's server sends as X-Storefront-Key. When set, the public
+    | API answers only our own website. Same value as STOREFRONT_API_KEY in the Next.js env.
+    */
+    'api_key' => env('STOREFRONT_API_KEY'),
+
     'order_number_prefix' => env('ORDER_NUMBER_PREFIX', 'NK'),
 
     /*

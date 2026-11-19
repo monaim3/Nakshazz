@@ -28,6 +28,26 @@ class StorefrontApiTest extends TestCase
     }
 
     #[Test]
+    public function with_a_key_set_the_public_api_answers_only_our_own_website(): void
+    {
+        config(['store.api_key' => 'test-key', 'cors.allowed_origins' => ['https://shop.example']]);
+        $this->product(['name' => 'Rose Jhumka']);
+
+        // typed into a browser tab, or fetched by a script: no key, no origin
+        $this->get('/api/v1/products', ['Accept' => 'text/html'])->assertUnauthorized()->assertExactJson(['message' => 'Unauthenticated.']);
+        $this->getJson('/api/v1/products')->assertUnauthorized();
+        // another website's page, or a wrong key
+        $this->getJson('/api/v1/products', ['Origin' => 'https://evil.example'])->assertUnauthorized();
+        $this->getJson('/api/v1/products', ['X-Storefront-Key' => 'wrong'])->assertUnauthorized();
+        $this->postJson('/api/v1/cart/validate', ['items' => []])->assertUnauthorized();
+
+        // the storefront's server (key) and a page of the storefront in a browser (origin / referer)
+        $this->getJson('/api/v1/products', ['X-Storefront-Key' => 'test-key'])->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/products', ['Origin' => 'https://shop.example'])->assertOk();
+        $this->getJson('/api/v1/products', ['Referer' => 'https://shop.example/shop?q=rose'])->assertOk();
+    }
+
+    #[Test]
     public function product_listing_shows_only_published_products_and_never_costs(): void
     {
         $published = $this->product(['name' => 'Rose Jhumka']);

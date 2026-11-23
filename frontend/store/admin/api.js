@@ -40,7 +40,9 @@ export const adminApi = createApi({
       query: (params) => ({ url: "/admin/dashboard", params }),
       providesTags: ["Dashboard"],
     }),
+    // sidebar badges; refreshed every minute and after any order, payment or message change
+    alerts: build.query({ query: () => "/admin/alerts", providesTags: ["Dashboard", "Message"] }),
   }),
 });
 
-export const { useMeQuery, useLoginMutation, useLogoutMutation, useDashboardQuery } = adminApi;
+export const { useMeQuery, useLoginMutation, useLogoutMutation, useDashboardQuery, useAlertsQuery } = adminApi;

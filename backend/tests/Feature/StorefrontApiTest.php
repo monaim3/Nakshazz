@@ -8,8 +8,11 @@ use App\Models\Coupon;
 use App\Models\DeliveryZone;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\User;
+use App\Notifications\NewWebsiteOrder;
 use Database\Seeders\StoreSettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -125,6 +128,28 @@ class StorefrontApiTest extends TestCase
             ->assertJsonMissingPath('data.items.0.unit_cost');
 
         $this->assertSame(2, $variant->refresh()->stock_reserved);
+    }
+
+    #[Test]
+    public function new_website_order_emails_the_active_shop_team(): void
+    {
+        Notification::fake();
+        $this->withoutDefer();
+        $owner = User::factory()->create(['role' => 'owner']);
+        $staff = User::factory()->create(['role' => 'staff']);
+        $former = User::factory()->create(['role' => 'staff', 'is_active' => false]);
+        $variant = $this->product()->variants->first();
+
+        $orderNumber = $this->postJson('/api/v1/checkout', $this->checkoutPayload($variant))->assertCreated()->json('data.order_number');
+
+        Notification::assertSentTo([$owner, $staff], NewWebsiteOrder::class, function (NewWebsiteOrder $notification, array $channels, User $user) use ($orderNumber) {
+            $mail = $notification->toMail($user);
+
+            return $notification->order->order_number === $orderNumber
+                && str_contains($mail->subject, $orderNumber)
+                && str_ends_with($mail->actionUrl, "/admin/orders/{$notification->order->id}");
+        });
+        Notification::assertNotSentTo($former, NewWebsiteOrder::class);
     }
 
     #[Test]

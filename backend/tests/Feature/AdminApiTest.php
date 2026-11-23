@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\MovementType;
 use App\Enums\ProductStatus;
 use App\Models\Category;
+use App\Models\ContactMessage;
 use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\Payment;
@@ -270,6 +271,26 @@ class AdminApiTest extends TestCase
         $this->assertSame('paid', $order->refresh()->payment_status->value);
 
         $this->postJson("/api/v1/admin/payments/{$payment->id}/verify")->assertConflict();
+    }
+
+    #[Test]
+    public function sidebar_alerts_count_what_needs_attention(): void
+    {
+        $variant = ProductVariant::factory()->for(Product::factory())->withStock(5)->create();
+        $zone = DeliveryZone::factory()->create();
+        $order = app(OrderService::class)->placeWebsiteOrder([
+            'customer' => ['name' => 'Ayesha', 'phone' => '01712345678'],
+            'shipping' => ['address' => 'Road 5', 'city' => 'Dhaka', 'delivery_zone_id' => $zone->id],
+            'items' => [['variant_id' => $variant->id, 'quantity' => 1]],
+            'payment' => ['method' => 'bkash', 'sender_number' => '01811111111', 'transaction_id' => 'TRX7654321'],
+        ]);
+        ContactMessage::query()->create(['name' => 'Rina', 'phone' => '01700000000', 'message' => 'Do you ship to Sylhet?']);
+
+        $this->getJson('/api/v1/admin/alerts')->assertUnauthorized();
+
+        $this->actingAs($this->staff)->getJson('/api/v1/admin/alerts')
+            ->assertOk()
+            ->assertExactJson(['data' => ['pending_orders' => 1, 'bkash_to_verify' => 1, 'unread_messages' => 1, 'latest_order_id' => $order->id]]);
     }
 
     #[Test]

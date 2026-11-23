@@ -2,21 +2,21 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BadgeDollarSign, Boxes, ChartColumn, FolderTree, Gem, Image as ImageIcon, LayoutDashboard, LogOut,
   Mail, Menu, Receipt, Settings, ShoppingBag, Star, Tag, Users, UserCog, Wallet, X, ClipboardPlus,
 } from "lucide-react";
-import { adminApi, useLogoutMutation, useMeQuery } from "@/store/admin/api";
+import { adminApi, useAlertsQuery, useLogoutMutation, useMeQuery } from "@/store/admin/api";
 import { useDispatch } from "react-redux";
-import { cx, LoadingBlock } from "./ui";
+import { cx, LoadingBlock, useToast } from "./ui";
 
 const NAV = [
   { section: "Sell" },
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { href: "/admin/orders", label: "Orders", icon: ShoppingBag, alert: "pending_orders" },
   { href: "/admin/sales/new", label: "New sale", icon: ClipboardPlus },
-  { href: "/admin/payments", label: "bKash verify", icon: Wallet },
+  { href: "/admin/payments", label: "bKash verify", icon: Wallet, alert: "bkash_to_verify" },
   { href: "/admin/customers", label: "Customers", icon: Users },
   { section: "Catalog" },
   { href: "/admin/products", label: "Products", icon: Gem },
@@ -25,7 +25,7 @@ const NAV = [
   { section: "Website" },
   { href: "/admin/reviews", label: "Reviews", icon: Star },
   { href: "/admin/content", label: "Banners & pages", icon: ImageIcon },
-  { href: "/admin/messages", label: "Messages", icon: Mail },
+  { href: "/admin/messages", label: "Messages", icon: Mail, alert: "unread_messages" },
   { section: "Business", ownerOnly: true },
   { href: "/admin/reports", label: "Sales & profit", icon: ChartColumn, ownerOnly: true },
   { href: "/admin/expenses", label: "Expenses", icon: Receipt, ownerOnly: true },
@@ -43,6 +43,7 @@ export default function AdminShell({ children }) {
   const [logout] = useLogoutMutation();
   const user = data?.data;
   const isOwner = Boolean(user?.permissions?.view_financials);
+  const alerts = useNewOrderAlerts(Boolean(user), pathname);
 
   useEffect(() => {
     if (error?.status === 401 || error?.status === 403) {
@@ -85,6 +86,11 @@ export default function AdminShell({ children }) {
           >
             <item.icon className="size-4 shrink-0" aria-hidden />
             {item.label}
+            {item.alert && alerts?.[item.alert] > 0 && (
+              <span className="ml-auto min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[11px] leading-5 font-semibold text-white" aria-label={`${alerts[item.alert]} waiting`}>
+                {alerts[item.alert] > 99 ? "99+" : alerts[item.alert]}
+              </span>
+            )}
           </Link>
         ),
       )}
@@ -124,8 +130,9 @@ export default function AdminShell({ children }) {
 
       {/* Mobile top bar + drawer */}
       <header className="no-print sticky top-0 z-30 flex h-14 items-center justify-between border-b border-ink-100 bg-white/95 px-4 backdrop-blur lg:hidden">
-        <button type="button" onClick={() => setDrawerOpen(true)} className="-ml-2 rounded-md p-2 text-ink-700" aria-label="Open menu">
+        <button type="button" onClick={() => setDrawerOpen(true)} className="relative -ml-2 rounded-md p-2 text-ink-700" aria-label={alerts?.total ? `Open menu, ${alerts.total} waiting` : "Open menu"}>
           <Menu className="size-5" />
+          {alerts?.total > 0 && <span className="absolute top-1.5 right-1.5 size-2.5 rounded-full bg-red-600 ring-2 ring-white" />}
         </button>
         <span className="font-display text-xl text-ink-900">Nakshazz</span>
         <Link href="/admin/sales/new" className="-mr-2 rounded-md p-2 text-gold-600" aria-label="New sale">
@@ -154,6 +161,60 @@ export default function AdminShell({ children }) {
       </main>
     </div>
   );
+}
+
+/**
+ * Counts for the sidebar badges, refreshed every minute (also while the tab is in the
+ * background). Puts the total in the browser tab title, and when a new order arrives shows
+ * a toast and plays a short chime, so a shop that keeps the panel open never misses one.
+ */
+function useNewOrderAlerts(enabled, pathname) {
+  const { notify } = useToast();
+  const { data } = useAlertsQuery(undefined, { skip: !enabled, pollingInterval: 60_000 });
+  const lastOrderId = useRef(null);
+  const counts = data?.data;
+  const total = counts ? counts.pending_orders + counts.bkash_to_verify + counts.unread_messages : 0;
+
+  useEffect(() => {
+    if (!counts) return;
+    if (lastOrderId.current !== null && counts.latest_order_id > lastOrderId.current) {
+      notify("New order received — see Orders");
+      chime();
+    }
+    lastOrderId.current = counts.latest_order_id;
+  }, [counts, notify]);
+
+  // the page sets its own title on navigation: re-apply the count after it
+  useEffect(() => {
+    const id = setTimeout(() => {
+      const base = document.title.replace(/^\(\d+\+?\) /, "");
+      document.title = total > 0 ? `(${total > 99 ? "99+" : total}) ${base}` : base;
+    }, 50);
+    return () => clearTimeout(id);
+  }, [total, pathname]);
+
+  return counts ? { ...counts, total } : null;
+}
+
+/** Two soft notes. Browsers only allow sound after the user has clicked on the page. */
+function chime() {
+  try {
+    const audio = new AudioContext();
+    [660, 880].forEach((frequency, i) => {
+      const tone = audio.createOscillator();
+      const gain = audio.createGain();
+      tone.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.0001, audio.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.15, audio.currentTime + i * 0.18 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + i * 0.18 + 0.35);
+      tone.connect(gain).connect(audio.destination);
+      tone.start(audio.currentTime + i * 0.18);
+      tone.stop(audio.currentTime + i * 0.18 + 0.4);
+    });
+    setTimeout(() => audio.close(), 1000);
+  } catch {
+    // no sound available: the toast and the badge still show it
+  }
 }
 
 /** Hide owner-only content from staff (the API enforces it too). */

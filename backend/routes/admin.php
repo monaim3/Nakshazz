@@ -15,6 +15,7 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::get('me', [Admin\AuthController::class, 'me'])->name('me');
 
     Route::get('dashboard', Admin\DashboardController::class)->name('dashboard');
+    Route::get('alerts', Admin\AlertsController::class)->name('alerts');
 
     // Catalog
     Route::apiResource('categories', Admin\CategoryController::class)->except('show');

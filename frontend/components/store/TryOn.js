@@ -369,7 +369,8 @@ export default function TryOn({ product, t, onClose }) {
     const canvas = canvasRef.current;
     const photo = photoRef.current;
     if (!canvas || !photo) return;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d");
+    canvas.style.filter = ""; // the camera's live studio light; a photo has it drawn in
     const place = placeRef.current;
     const settings = settingsRef.current;
     ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
@@ -416,6 +417,25 @@ export default function TryOn({ product, t, onClose }) {
       }
       // small or strongly tilted face: look again at zoomed and rotated views
       if (!face) face = detectHarder(landmarker, scratch, pose);
+      if (face) {
+        // frame it like a portrait: a face that fills a small part of a phone screen leaves
+        // the jewellery a few pixels big. Small photos are also enlarged so the jewellery
+        // (a sharp, detailed image) is drawn at full quality.
+        const { x0, y0, cw, ch } = portraitFrame(face, scratch.width, scratch.height, piece.type);
+        const k = Math.min(2.5, Math.max(1, 1200 / Math.max(cw, ch)));
+        const framed = document.createElement("canvas");
+        framed.width = Math.round(cw * k);
+        framed.height = Math.round(ch * k);
+        const fctx = framed.getContext("2d");
+        fctx.imageSmoothingQuality = "high";
+        fctx.drawImage(scratch, x0, y0, cw, ch, 0, 0, framed.width, framed.height);
+        const move = (l) => ({ ...l, x: (l.x * scratch.width - x0) / cw, y: (l.y * scratch.height - y0) / ch, z: ((l.z || 0) * scratch.width) / cw });
+        face = face.map(move);
+        pose = pose?.map(move) || null;
+        photoRef.current = framed;
+        canvas.width = framed.width;
+        canvas.height = framed.height;
+      }
       placeRef.current = face ? computePlacement(face, canvas.width, canvas.height, false, pose) : null;
       setNoFace(!placeRef.current);
       setMode("photo");
@@ -446,33 +466,33 @@ export default function TryOn({ product, t, onClose }) {
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      // no willReadFrequently: that would keep the canvas off the phone's graphics chip and
+      // make every camera frame slow; the light is only read a few times a second
+      const ctx = canvas.getContext("2d");
       setMode("camera");
 
       let smooth = null;
-      let grade = gradeFromSkin(null);
       let look = null;
       const swingState = {};
-      // mirrored like a real mirror
-      const drawFrame = (filter) => {
-        ctx.save();
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
-        ctx.filter = filter;
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        ctx.restore();
-      };
       const loop = () => {
         if (!streamRef.current) return;
         const settings = settingsRef.current;
         const studioOn = settings.studio && FILTERS;
-        // light is read a few times a second, not every frame
+        // mirrored like a real mirror
+        ctx.save();
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+        // light is read a few times a second, not every frame. Studio light on camera is a
+        // CSS filter on the canvas (done by the graphics chip, free); a captured photo gets
+        // the same look drawn in (see redrawPhoto).
         const sampleNow = frame % 12 === 0;
-        if (studioOn && sampleNow && smooth) {
-          drawFrame("none");
-          grade = gradeFromSkin(sampleSkin(ctx, smooth));
+        if (sampleNow && smooth) {
+          const skin = sampleSkin(ctx, smooth);
+          look = lookFromSkin(skin);
+          canvas.style.filter = studioOn ? gradeFromSkin(skin) : "";
         }
-        drawFrame(studioOn ? grade : "none");
         if (studioOn) finishStudio(ctx, canvas.width, canvas.height);
         const now = performance.now();
         const result = landmarker.detectForVideo(video, now);
@@ -485,7 +505,6 @@ export default function TryOn({ product, t, onClose }) {
           // light smoothing so the piece does not jitter
           smooth = smooth ? blend(smooth, next, 0.45) : next;
           placeRef.current = smooth;
-          if (sampleNow || !look) look = lookFromSkin(sampleSkin(ctx, smooth));
           const swing = piece.type === "earring" ? updateSwing(swingState, smooth, piece.size_mm * smooth.mmToPx * settings.scale) : null;
           if (imgRef.current) drawPiece(ctx, piece, imgRef.current, smooth, { ...settings, look, time: now, swing });
         }
@@ -628,7 +647,7 @@ export default function TryOn({ product, t, onClose }) {
       </div>
 
       {(mode === "camera" || mode === "photo") && (
-        <div className="space-y-3 px-4 py-4 sm:px-6">
+        <div className="space-y-3 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
           <div className="mx-auto grid max-w-xl gap-3 sm:grid-cols-2">
             <label className="text-xs text-white/70">
               {t.size} {Math.round(scale * 100)}%
@@ -774,6 +793,33 @@ function visibleBox(img) {
   }
 }
 
+/**
+ * Portrait crop (4:5) round the face: head and ears for earrings and nose pins, down to the
+ * shoulders for necklaces. The whole photo when the face already fills most of it.
+ */
+function portraitFrame(face, W, H, type) {
+  const xs = face.map((l) => l.x * W);
+  const ys = face.map((l) => l.y * H);
+  const fx0 = Math.min(...xs);
+  const fx1 = Math.max(...xs);
+  const fy0 = Math.min(...ys);
+  const fy1 = Math.max(...ys);
+  const fh = fy1 - fy0;
+  const whole = { x0: 0, y0: 0, cw: W, ch: H };
+  let ch = fh * (type === "necklace" ? 3.6 : 2.7);
+  let cw = ch * 0.8;
+  if (ch >= H * 0.8 && cw >= W * 0.8) return whole;
+  // never larger than the photo, same 4:5 shape
+  const fit = Math.min(1, W / cw, H / ch);
+  cw *= fit;
+  ch *= fit;
+  const cx = (fx0 + fx1) / 2;
+  const cy = (fy0 + fy1) / 2 + fh * (type === "necklace" ? 0.8 : 0.3);
+  const x0 = clamp(cx - cw / 2, 0, W - cw);
+  const y0 = clamp(cy - ch / 2, 0, H - ch);
+  return { x0: Math.round(x0), y0: Math.round(y0), cw: Math.round(cw), ch: Math.round(ch) };
+}
+
 /** Average colour and brightness (0-1) of the skin at the cheeks and nose, or null. */
 function sampleSkin(ctx, place) {
   const r = Math.max(3, Math.round(place.mmToPx * 4));
@@ -815,7 +861,7 @@ function lookFromSkin(skin) {
 
 /** Studio light: lifts a dim or flat photo towards well-lit skin, a little richer colour. */
 function gradeFromSkin(skin) {
-  const brightness = skin ? clamp(0.62 / Math.max(skin.lum, 0.05), 0.94, 1.35) : 1;
+  const brightness = skin ? clamp(0.62 / Math.max(skin.lum, 0.05), 0.94, 1.22) : 1;
   return `brightness(${brightness.toFixed(3)}) contrast(1.07) saturate(1.12)`;
 }
 

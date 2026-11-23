@@ -81,13 +81,22 @@ export default async function HomePage() {
       )}
 
       <ProductSection
+        title={t.newArrivals}
+        products={home.new_arrivals}
+        lang={lang}
+        dict={dict}
+        href={localePath(lang, "/shop?sort=newest")}
+        linkLabel={t.viewAll}
+        tone="band"
+      />
+
+      <ProductSection
         title={t.featured}
         products={home.featured}
         lang={lang}
         dict={dict}
         href={localePath(lang, "/shop?featured=1")}
         linkLabel={t.viewAll}
-        tone="band"
       />
 
       {home.promo_banners.length > 0 && (
@@ -125,15 +134,6 @@ export default async function HomePage() {
           ))}
         </section>
       )}
-
-      <ProductSection
-        title={t.newArrivals}
-        products={home.new_arrivals}
-        lang={lang}
-        dict={dict}
-        href={localePath(lang, "/shop?sort=newest")}
-        linkLabel={t.viewAll}
-      />
 
       <section className="relative overflow-hidden bg-[linear-gradient(160deg,var(--color-teal-100),var(--color-ivory-100)_70%)] [content-visibility:auto] [contain-intrinsic-size:auto_900px]">
         <FallingPetals />

@@ -30,25 +30,36 @@ async function apiGet(path) {
   return (await response.json()).data;
 }
 
+/**
+ * For data every page needs, "no answer" means the API is down or something else is on its
+ * address, not that the thing does not exist. Throwing (instead of returning null) keeps that
+ * empty answer out of the hour-long cache, so the shop recovers as soon as the API is back.
+ */
+async function apiGetRequired(path) {
+  const data = await apiGet(path);
+  if (data == null) throw new Error(`API returned no data for ${path}`);
+  return data;
+}
+
 export async function getSettings() {
   "use cache";
   cacheLife("hours");
   cacheTag("settings");
-  return apiGet("/settings");
+  return apiGetRequired("/settings");
 }
 
 export async function getHome() {
   "use cache";
   cacheLife("hours");
   cacheTag("home", "products", "categories");
-  return apiGet("/home");
+  return apiGetRequired("/home");
 }
 
 export async function getCategories() {
   "use cache";
   cacheLife("hours");
   cacheTag("categories");
-  return (await apiGet("/categories")) || [];
+  return apiGetRequired("/categories");
 }
 
 export async function getProduct(slug) {

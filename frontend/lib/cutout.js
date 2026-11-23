@@ -310,6 +310,169 @@ export function findObjects(mask, w, h) {
     });
 }
 
+/** Sum of `src` over a (2r+1)² window around every pixel (two prefix-sum passes). */
+function windowSum(src, w, h, r) {
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  const row = new Float64Array(w + 1);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) row[x + 1] = row[x] + src[y * w + x];
+    for (let x = 0; x < w; x++) tmp[y * w + x] = row[Math.min(w, x + r + 1)] - row[Math.max(0, x - r)];
+  }
+  const col = new Float64Array(h + 1);
+  for (let x = 0; x < w; x++) {
+    for (let y = 0; y < h; y++) col[y + 1] = col[y] + tmp[y * w + x];
+    for (let y = 0; y < h; y++) out[y * w + x] = col[Math.min(h, y + r + 1)] - col[Math.max(0, y - r)];
+  }
+  return out;
+}
+
+/**
+ * Cleans the outline of a cut-out. The model's mask is made at 320 px and blown up, so its
+ * edge is soft and carries a rim of background (the white "shadow" round the piece). Along
+ * the outline every pixel is treated as a mix of the piece's colour and the background
+ * colour next to it (both read from the neighbourhood):
+ *   - how much of it is piece becomes its transparency (sharp edge, rim gone, holes in
+ *     filigree open up)
+ *   - the background's share is taken out of its colour (no light fringe on a dark face)
+ * Where the background is busy (flowers, books) the mix cannot be read reliably and the
+ * model's edge is kept. Works on a crop; returns new pixel and alpha arrays.
+ */
+export function refineEdges(rgba, alpha, mask, w, h) {
+  const n = w * h;
+  const side = Math.max(w, h);
+  const R = Math.max(6, Math.round(side / 25));
+  const D = Math.max(2, Math.round(side / 250));
+
+  const background = new Uint8Array(n);
+  for (let p = 0; p < n; p++) background[p] = mask[p] < 128 ? 1 : 0;
+  const nearBackground = dilate(background, w, h, D);
+
+  const bgW = new Float32Array(n);
+  const fgW = new Float32Array(n);
+  for (let p = 0; p < n; p++) {
+    if (mask[p] < 25) bgW[p] = 1;
+    if (alpha[p] > 240 && !nearBackground[p]) fgW[p] = 1;
+  }
+  const weighted = (weights, channel) => {
+    const out = new Float32Array(n);
+    for (let p = 0; p < n; p++) out[p] = weights[p] ? (channel < 3 ? rgba[p * 4 + channel] : rgba[p * 4] ** 2 + rgba[p * 4 + 1] ** 2 + rgba[p * 4 + 2] ** 2) : 0;
+    return windowSum(out, w, h, R);
+  };
+  const Wb = windowSum(bgW, w, h, R);
+  const Wf = windowSum(fgW, w, h, R);
+  const B = [0, 1, 2].map((c) => weighted(bgW, c));
+  const Bsq = weighted(bgW, 3);
+  const F = [0, 1, 2].map((c) => weighted(fgW, c));
+
+  const outRgba = new Uint8ClampedArray(rgba);
+  const outAlpha = new Uint8Array(alpha);
+  for (let p = 0; p < n; p++) {
+    if (!alpha[p] || !nearBackground[p] || Wb[p] < 4) continue;
+    const b = [B[0][p] / Wb[p], B[1][p] / Wb[p], B[2][p] / Wb[p]];
+    const spread = Math.sqrt(Math.max(0, Bsq[p] / Wb[p] - b[0] ** 2 - b[1] ** 2 - b[2] ** 2));
+    if (spread > 32) continue; // busy background: keep the model's edge
+    const i = [rgba[p * 4], rgba[p * 4 + 1], rgba[p * 4 + 2]];
+    let a = alpha[p] / 255;
+    if (Wf[p] >= 4) {
+      const d = [F[0][p] / Wf[p] - b[0], F[1][p] / Wf[p] - b[1], F[2][p] / Wf[p] - b[2]];
+      const den = d[0] ** 2 + d[1] ** 2 + d[2] ** 2;
+      // piece and background clearly different colours: read the mix from the colour
+      if (den > 1600) a = Math.min(1, Math.max(0, ((i[0] - b[0]) * d[0] + (i[1] - b[1]) * d[1] + (i[2] - b[2]) * d[2]) / den));
+    }
+    if (a < 0.06) {
+      outAlpha[p] = 0;
+      continue;
+    }
+    outAlpha[p] = Math.round(a * 255);
+    for (let c = 0; c < 3; c++) outRgba[p * 4 + c] = b[c] + (i[c] - b[c]) / a;
+  }
+  return { rgba: outRgba, alpha: outAlpha };
+}
+
+/**
+ * Removes leftovers stuck to the outside of the piece: bits of a black display stand, and
+ * patches of backdrop the model kept because the stand closed them in (the light "shadow"
+ * at the top of an earring). Starting from the outline it eats inward only through pixels
+ * that look like stand (near-black grey) or like the backdrop right there (same colour,
+ * smooth). White enamel or pearls inside the piece are walled off by metal and stay.
+ * Returns new alpha and model-mask arrays (removed pixels count as background), or the
+ * originals when it would remove a suspicious amount.
+ */
+export function cleanRim(rgba, alpha, mask, w, h, { stand = true } = {}) {
+  const n = w * h;
+  const side = Math.max(w, h);
+  const lum = (p) => 0.299 * rgba[p * 4] + 0.587 * rgba[p * 4 + 1] + 0.114 * rgba[p * 4 + 2];
+
+  // backdrop colour around each pixel (from what the model called background)
+  const R = Math.max(8, Math.round(side / 12));
+  const bgW = new Float32Array(n);
+  for (let p = 0; p < n; p++) if (mask[p] < 25) bgW[p] = 1;
+  const Wb = windowSum(bgW, w, h, R);
+  const B = [0, 1, 2].map((c) => {
+    const ch = new Float32Array(n);
+    for (let p = 0; p < n; p++) if (bgW[p]) ch[p] = rgba[p * 4 + c];
+    return windowSum(ch, w, h, R);
+  });
+
+  const smooth = (p) => {
+    const x = p % w;
+    if (x < 1 || x >= w - 1 || p < w || p >= n - w) return true;
+    return Math.abs(lum(p + 1) - lum(p - 1)) + Math.abs(lum(p + w) - lum(p - w)) < 26;
+  };
+  const standLike = (p) => {
+    if (!stand) return false;
+    const r = rgba[p * 4];
+    const g = rgba[p * 4 + 1];
+    const b = rgba[p * 4 + 2];
+    const mx = Math.max(r, g, b);
+    return mx < 40 && mx - Math.min(r, g, b) < 18;
+  };
+  const backdropLike = (p) => {
+    if (Wb[p] < 4) return false;
+    const d = Math.hypot(rgba[p * 4] - B[0][p] / Wb[p], rgba[p * 4 + 1] - B[1][p] / Wb[p], rgba[p * 4 + 2] - B[2][p] / Wb[p]);
+    return d < 28 && smooth(p);
+  };
+
+  const removed = new Uint8Array(n); // 1 = backdrop, 2 = stand
+  const queue = [];
+  const consider = (p) => {
+    if (removed[p] || alpha[p] < 25) return;
+    if (standLike(p)) removed[p] = 2;
+    else if (backdropLike(p)) removed[p] = 1;
+    else return;
+    queue.push(p);
+  };
+  for (let p = 0; p < n; p++) {
+    if (alpha[p] < 25) continue;
+    const x = p % w;
+    const onOutline = x === 0 || x === w - 1 || p < w || p >= n - w || alpha[p - 1] < 25 || alpha[p + 1] < 25 || alpha[p - w] < 25 || alpha[p + w] < 25;
+    if (onOutline) consider(p);
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const p = queue[i];
+    const x = p % w;
+    if (x > 0) consider(p - 1);
+    if (x < w - 1) consider(p + 1);
+    if (p >= w) consider(p - w);
+    if (p < n - w) consider(p + w);
+  }
+
+  let visible = 0;
+  for (let p = 0; p < n; p++) if (alpha[p] >= 25) visible++;
+  if (queue.length > visible * 0.3) return { alpha, mask }; // looks like the piece itself: leave it
+
+  const outAlpha = new Uint8Array(alpha);
+  const outMask = new Uint8Array(mask);
+  for (let p = 0; p < n; p++) {
+    if (!removed[p]) continue;
+    outAlpha[p] = 0;
+    // backdrop helps read the background colour later; the stand must not (it is black)
+    outMask[p] = removed[p] === 1 ? 0 : 60;
+  }
+  return { alpha: outAlpha, mask: outMask };
+}
+
 /** Bounding box of visible pixels (alpha > 24) or null when empty. */
 export function alphaBounds(alpha, w, h) {
   let x0 = w;

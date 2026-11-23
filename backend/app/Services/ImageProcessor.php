@@ -46,13 +46,13 @@ class ImageProcessor
     }
 
     /**
-     * Single-size image (banners, category images, logo).
+     * Single-size image (banners, category images, logo, try-on cut-outs).
      */
-    public function storeSingle(UploadedFile $file, string $directory, int $maxWidth = 2000): string
+    public function storeSingle(UploadedFile $file, string $directory, int $maxWidth = 2000, int $quality = self::QUALITY): string
     {
         $manager = new ImageManager(new Driver);
         $path = trim($directory, '/').'/'.Str::ulid()->toBase32().'.webp';
-        $encoded = $manager->decodePath($file->getRealPath())->orient()->scaleDown(width: $maxWidth)->encode(new WebpEncoder(self::QUALITY, strip: true));
+        $encoded = $manager->decodePath($file->getRealPath())->orient()->scaleDown(width: $maxWidth)->encode(new WebpEncoder($quality, strip: true));
 
         Storage::disk('public')->put($path, $encoded->toString());
 

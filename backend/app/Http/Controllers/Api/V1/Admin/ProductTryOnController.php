@@ -24,7 +24,7 @@ class ProductTryOnController extends Controller
         ]);
 
         $old = $product->tryon_image_path;
-        $product->forceFill(['tryon_image_path' => $images->storeSingle($request->file('image'), "tryon/{$product->id}", 1000)])->save();
+        $product->forceFill(['tryon_image_path' => $images->storeSingle($request->file('image'), "tryon/{$product->id}", 1400, 94)])->save();
         $images->delete($old);
         $products->revalidateProduct($product);
 

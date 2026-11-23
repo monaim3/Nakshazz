@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Crop, Eraser, ImageUp, RotateCcw, Wand2 } from "lucide-react";
-import { alphaBounds, findObjects, findPieces, foregroundMask } from "@/lib/cutout";
+import { alphaBounds, cleanRim, findObjects, findPieces, foregroundMask, refineEdges } from "@/lib/cutout";
 import { Button, Modal, Spinner } from "@/components/admin/ui";
 
-const MAX_SIDE = 1100;
+const MAX_SIDE = 2000; // product photos are stored at 1600px: keep every pixel of them
 
 /**
  * One-click cut-out for the try-on photo: pick a normal product photo, the browser removes
@@ -39,17 +39,62 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
     [],
   );
 
+  /**
+   * The finished cut-out of a piece: the piece plus a margin (where the background is read),
+   * stand bits and trapped backdrop removed, outline cleaned. Null when nothing is left.
+   */
+  const cleanCut = useCallback(
+    (index) => {
+      const { w, h, rgba, mask } = state.current;
+      const alpha = alphaAt(index);
+      const bounds = alphaBounds(alpha, w, h);
+      if (!bounds) return null;
+      const pad = Math.round(Math.max(w, h) / 20);
+      const x0 = Math.max(0, bounds.x - pad);
+      const y0 = Math.max(0, bounds.y - pad);
+      const cw = Math.min(w, bounds.x + bounds.w + pad) - x0;
+      const ch = Math.min(h, bounds.y + bounds.h + pad) - y0;
+      const cropRgba = new Uint8ClampedArray(cw * ch * 4);
+      const cropAlpha = new Uint8Array(cw * ch);
+      const cropMask = new Uint8Array(cw * ch);
+      for (let y = 0; y < ch; y++) {
+        const from = (y0 + y) * w + x0;
+        cropRgba.set(rgba.subarray(from * 4, (from + cw) * 4), y * cw * 4);
+        cropAlpha.set(alpha.subarray(from, from + cw), y * cw);
+        cropMask.set(mask.subarray(from, from + cw), y * cw);
+      }
+      // 1) stand bits and trapped backdrop stuck to the outside, 2) clean, sharp outline
+      const rim = cleanRim(cropRgba, cropAlpha, cropMask, cw, ch, { stand: type === "earring" });
+      const clean = refineEdges(cropRgba, rim.alpha, rim.mask, cw, ch);
+      const image = new ImageData(clean.rgba, cw, ch);
+      for (let p = 0; p < clean.alpha.length; p++) image.data[p * 4 + 3] = clean.alpha[p];
+      return { x0, y0, cw, ch, image, alpha: clean.alpha };
+    },
+    [alphaAt, type],
+  );
+
+  const refineTimer = useRef(0);
+  useEffect(() => () => clearTimeout(refineTimer.current), []);
+
   const render = useCallback(
     (index) => {
       const canvas = canvasRef.current;
       const { w, h, rgba } = state.current;
       if (!canvas || !rgba) return;
+      // quick draw right away (smooth erasing), the cleaned result a moment after the last change
       const alpha = alphaAt(index);
       const image = new ImageData(new Uint8ClampedArray(rgba), w, h);
       for (let p = 0; p < alpha.length; p++) image.data[p * 4 + 3] = alpha[p];
-      canvas.getContext("2d").putImageData(image, 0, 0);
+      const ctx = canvas.getContext("2d");
+      ctx.putImageData(image, 0, 0);
+      clearTimeout(refineTimer.current);
+      refineTimer.current = setTimeout(() => {
+        const cut = cleanCut(index);
+        ctx.clearRect(0, 0, w, h);
+        if (cut) ctx.putImageData(cut.image, cut.x0, cut.y0);
+      }, 250);
     },
-    [alphaAt],
+    [alphaAt, cleanCut],
   );
 
   useEffect(() => {
@@ -139,23 +184,20 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
   }
 
   function finish() {
-    const { w, h, rgba } = state.current;
-    const alpha = alphaAt(pieceIndex);
-    const bounds = alphaBounds(alpha, w, h);
-    if (!bounds) {
+    const cut = cleanCut(pieceIndex);
+    const tight = cut && alphaBounds(cut.alpha, cut.cw, cut.ch);
+    if (!tight) {
       setError("Nothing is left in the picture. Reset and try again.");
       return;
     }
     const full = document.createElement("canvas");
-    full.width = w;
-    full.height = h;
-    const image = new ImageData(new Uint8ClampedArray(rgba), w, h);
-    for (let p = 0; p < alpha.length; p++) image.data[p * 4 + 3] = alpha[p];
-    full.getContext("2d").putImageData(image, 0, 0);
+    full.width = cut.cw;
+    full.height = cut.ch;
+    full.getContext("2d").putImageData(cut.image, 0, 0);
     const out = document.createElement("canvas");
-    out.width = bounds.w;
-    out.height = bounds.h;
-    out.getContext("2d").drawImage(full, bounds.x, bounds.y, bounds.w, bounds.h, 0, 0, bounds.w, bounds.h);
+    out.width = tight.w;
+    out.height = tight.h;
+    out.getContext("2d").drawImage(full, tight.x, tight.y, tight.w, tight.h, 0, 0, tight.w, tight.h);
     out.toBlob((blob) => blob && onDone(new File([blob], "tryon-cutout.png", { type: "image/png" })), "image/png");
   }
 

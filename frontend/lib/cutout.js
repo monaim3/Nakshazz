@@ -377,8 +377,18 @@ export function refineEdges(rgba, alpha, mask, w, h) {
     if (Wf[p] >= 4) {
       const d = [F[0][p] / Wf[p] - b[0], F[1][p] / Wf[p] - b[1], F[2][p] / Wf[p] - b[2]];
       const den = d[0] ** 2 + d[1] ** 2 + d[2] ** 2;
-      // piece and background clearly different colours: read the mix from the colour
-      if (den > 1600) a = Math.min(1, Math.max(0, ((i[0] - b[0]) * d[0] + (i[1] - b[1]) * d[1] + (i[2] - b[2]) * d[2]) / den));
+      if (den > 1600) {
+        // read the mix from the colour, but only when the pixel really lies between the piece
+        // and the backdrop: a highlight on silver or a stone of another colour is not a mix
+        // and must stay solid
+        const t = ((i[0] - b[0]) * d[0] + (i[1] - b[1]) * d[1] + (i[2] - b[2]) * d[2]) / den;
+        const mixT = Math.min(1, Math.max(0, t));
+        const off = Math.hypot(i[0] - b[0] - mixT * d[0], i[1] - b[1] - mixT * d[1], i[2] - b[2] - mixT * d[2]);
+        if (t > -0.1 && t < 1.1 && off < 26) {
+          // where the model was sure, only clear pixels that are plainly backdrop (the rim)
+          a = alpha[p] >= 250 ? (mixT < 0.3 ? mixT : 1) : mixT;
+        }
+      }
     }
     if (a < 0.06) {
       outAlpha[p] = 0;
@@ -391,15 +401,16 @@ export function refineEdges(rgba, alpha, mask, w, h) {
 }
 
 /**
- * Removes leftovers stuck to the outside of the piece: bits of a black display stand, and
- * patches of backdrop the model kept because the stand closed them in (the light "shadow"
- * at the top of an earring). Starting from the outline it eats inward only through pixels
- * that look like stand (near-black grey) or like the backdrop right there (same colour,
- * smooth). White enamel or pearls inside the piece are walled off by metal and stay.
+ * Removes backdrop stuck to the outside of the piece: patches the model kept because a
+ * display stand closed them in (the light "shadow" at the top of an earring). Starting from
+ * the outline it eats inward only through pixels that look like the backdrop right there
+ * (same colour, smooth over a 5×5 area). White enamel or pearls inside the piece are walled
+ * off by metal and stay. Stand leftovers are NOT removed here: oxidised silver has the same
+ * near-black edges, so that is left to the Magic eraser.
  * Returns new alpha and model-mask arrays (removed pixels count as background), or the
  * originals when it would remove a suspicious amount.
  */
-export function cleanRim(rgba, alpha, mask, w, h, { stand = true } = {}) {
+export function cleanRim(rgba, alpha, mask, w, h) {
   const n = w * h;
   const side = Math.max(w, h);
   const lum = (p) => 0.299 * rgba[p * 4] + 0.587 * rgba[p * 4 + 1] + 0.114 * rgba[p * 4 + 2];
@@ -415,32 +426,24 @@ export function cleanRim(rgba, alpha, mask, w, h, { stand = true } = {}) {
     return windowSum(ch, w, h, R);
   });
 
-  const smooth = (p) => {
+  // texture around each pixel: a backdrop is smooth, jewellery (even a polished highlight
+  // next to its edge) is not
+  const grad = new Float32Array(n);
+  for (let p = w; p < n - w; p++) {
     const x = p % w;
-    if (x < 1 || x >= w - 1 || p < w || p >= n - w) return true;
-    return Math.abs(lum(p + 1) - lum(p - 1)) + Math.abs(lum(p + w) - lum(p - w)) < 26;
-  };
-  const standLike = (p) => {
-    if (!stand) return false;
-    const r = rgba[p * 4];
-    const g = rgba[p * 4 + 1];
-    const b = rgba[p * 4 + 2];
-    const mx = Math.max(r, g, b);
-    return mx < 40 && mx - Math.min(r, g, b) < 18;
-  };
+    if (x > 0 && x < w - 1) grad[p] = Math.abs(lum(p + 1) - lum(p - 1)) + Math.abs(lum(p + w) - lum(p - w));
+  }
+  const texture = windowSum(grad, w, h, 2);
   const backdropLike = (p) => {
-    if (Wb[p] < 4) return false;
-    const d = Math.hypot(rgba[p * 4] - B[0][p] / Wb[p], rgba[p * 4 + 1] - B[1][p] / Wb[p], rgba[p * 4 + 2] - B[2][p] / Wb[p]);
-    return d < 28 && smooth(p);
+    if (Wb[p] < 4 || texture[p] / 25 >= 9) return false;
+    return Math.hypot(rgba[p * 4] - B[0][p] / Wb[p], rgba[p * 4 + 1] - B[1][p] / Wb[p], rgba[p * 4 + 2] - B[2][p] / Wb[p]) < 24;
   };
 
-  const removed = new Uint8Array(n); // 1 = backdrop, 2 = stand
+  const removed = new Uint8Array(n);
   const queue = [];
   const consider = (p) => {
-    if (removed[p] || alpha[p] < 25) return;
-    if (standLike(p)) removed[p] = 2;
-    else if (backdropLike(p)) removed[p] = 1;
-    else return;
+    if (removed[p] || alpha[p] < 25 || !backdropLike(p)) return;
+    removed[p] = 1;
     queue.push(p);
   };
   for (let p = 0; p < n; p++) {
@@ -464,13 +467,39 @@ export function cleanRim(rgba, alpha, mask, w, h, { stand = true } = {}) {
 
   const outAlpha = new Uint8Array(alpha);
   const outMask = new Uint8Array(mask);
-  for (let p = 0; p < n; p++) {
-    if (!removed[p]) continue;
+  for (const p of queue) {
     outAlpha[p] = 0;
-    // backdrop helps read the background colour later; the stand must not (it is black)
-    outMask[p] = removed[p] === 1 ? 0 : 60;
+    outMask[p] = 0;
   }
   return { alpha: outAlpha, mask: outMask };
+}
+
+/**
+ * Magic eraser: everything visible that is connected to the clicked pixel and of a similar
+ * colour (a stand arm, a patch of backdrop). Returns the pixel indexes to erase, or an empty
+ * list when the click hit nothing or would swallow a suspicious share of the piece.
+ */
+export function similarRegion(rgba, alpha, w, h, start, tolerance = 42) {
+  const n = w * h;
+  if (start < 0 || start >= n || alpha[start] < 25) return [];
+  const r0 = rgba[start * 4];
+  const g0 = rgba[start * 4 + 1];
+  const b0 = rgba[start * 4 + 2];
+  const seen = new Uint8Array(n);
+  const region = [start];
+  seen[start] = 1;
+  for (let i = 0; i < region.length; i++) {
+    const p = region[i];
+    const x = p % w;
+    for (const q of [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, p - w, p + w]) {
+      if (q < 0 || q >= n || seen[q] || alpha[q] < 25) continue;
+      seen[q] = 1;
+      if (Math.hypot(rgba[q * 4] - r0, rgba[q * 4 + 1] - g0, rgba[q * 4 + 2] - b0) < tolerance) region.push(q);
+    }
+  }
+  let visible = 0;
+  for (let p = 0; p < n; p++) if (alpha[p] >= 25) visible++;
+  return region.length > visible * 0.4 ? [] : region;
 }
 
 /** Bounding box of visible pixels (alpha > 24) or null when empty. */

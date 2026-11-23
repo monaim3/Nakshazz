@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Crop, Eraser, ImageUp, RotateCcw, Wand2 } from "lucide-react";
-import { alphaBounds, cleanRim, findObjects, findPieces, foregroundMask, refineEdges } from "@/lib/cutout";
+import { Crop, Eraser, ImageUp, RotateCcw, Sparkles, Undo2, Wand2 } from "lucide-react";
+import { alphaBounds, cleanRim, findObjects, findPieces, foregroundMask, refineEdges, similarRegion } from "@/lib/cutout";
 import { Button, Modal, Spinner } from "@/components/admin/ui";
 
 const MAX_SIDE = 2000; // product photos are stored at 1600px: keep every pixel of them
@@ -23,7 +23,9 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
   const [pieceCount, setPieceCount] = useState(0);
   const [brush, setBrush] = useState(18);
   const painting = useRef(false);
-  const [tool, setTool] = useState("erase"); // erase | area
+  const [tool, setTool] = useState("magic"); // magic | erase | area
+  const history = useRef([]); // erased-mask snapshots for Undo
+  const [canUndo, setCanUndo] = useState(false);
   const [box, setBox] = useState(null); // keep-area rectangle while dragging, in % of the canvas
   const boxStart = useRef(null);
 
@@ -63,14 +65,14 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
         cropAlpha.set(alpha.subarray(from, from + cw), y * cw);
         cropMask.set(mask.subarray(from, from + cw), y * cw);
       }
-      // 1) stand bits and trapped backdrop stuck to the outside, 2) clean, sharp outline
-      const rim = cleanRim(cropRgba, cropAlpha, cropMask, cw, ch, { stand: type === "earring" });
+      // 1) backdrop trapped against the outside, 2) clean, sharp outline
+      const rim = cleanRim(cropRgba, cropAlpha, cropMask, cw, ch);
       const clean = refineEdges(cropRgba, rim.alpha, rim.mask, cw, ch);
       const image = new ImageData(clean.rgba, cw, ch);
       for (let p = 0; p < clean.alpha.length; p++) image.data[p * 4 + 3] = clean.alpha[p];
       return { x0, y0, cw, ch, image, alpha: clean.alpha };
     },
-    [alphaAt, type],
+    [alphaAt],
   );
 
   const refineTimer = useRef(0);
@@ -120,6 +122,8 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
       // earrings: one earring off its stand; anything else: each separate object
       const pieces = type === "earring" ? findPieces(rgba, mask, w, h) : findObjects(mask, w, h);
       state.current = { w, h, rgba, mask, pieces, erased: new Uint8Array(w * h) };
+      history.current = [];
+      setCanUndo(false);
       const canvas = canvasRef.current;
       canvas.width = w;
       canvas.height = h;
@@ -146,6 +150,39 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
       setError("Could not load this photo. Please try again.");
       setStage("pick");
     }
+  }
+
+  /** Remember the current state so the next change can be undone. */
+  function snapshot() {
+    history.current.push(state.current.erased.slice());
+    if (history.current.length > 15) history.current.shift();
+    setCanUndo(true);
+  }
+
+  function undo() {
+    const last = history.current.pop();
+    if (!last) return;
+    state.current.erased = last;
+    setCanUndo(history.current.length > 0);
+    render(pieceIndex);
+  }
+
+  /** Magic eraser: one click removes the connected patch of that colour (a stand arm, backdrop). */
+  function magicErase(event) {
+    const canvas = canvasRef.current;
+    const box = canvas.getBoundingClientRect();
+    const { w, h, rgba, erased } = state.current;
+    const x = Math.min(w - 1, Math.max(0, Math.round(((event.clientX - box.left) / box.width) * w)));
+    const y = Math.min(h - 1, Math.max(0, Math.round(((event.clientY - box.top) / box.height) * h)));
+    const region = similarRegion(rgba, alphaAt(pieceIndex), w, h, y * w + x);
+    if (!region.length) return;
+    snapshot();
+    // the patch plus one pixel round it (its soft edge)
+    for (const p of region) {
+      const px = p % w;
+      for (const q of [p, p - w, p + w, px > 0 ? p - 1 : -1, px < w - 1 ? p + 1 : -1]) if (q >= 0 && q < erased.length) erased[q] = 1;
+    }
+    render(pieceIndex);
   }
 
   function erase(event) {
@@ -176,6 +213,7 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
     const y0 = Math.round(Math.min(a.y, b.y) * h);
     const y1 = Math.round(Math.max(a.y, b.y) * h);
     if (x1 - x0 < 8 || y1 - y0 < 8) return; // a click, not a drag
+    snapshot();
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) if (x < x0 || x > x1 || y < y0 || y > y1) erased[y * w + x] = 1;
     }
@@ -245,8 +283,13 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
               onPointerDown={(event) => {
                 painting.current = true;
                 event.currentTarget.setPointerCapture(event.pointerId);
-                if (tool === "erase") erase(event);
-                else boxStart.current = pointAt(event);
+                if (tool === "magic") {
+                  painting.current = false;
+                  magicErase(event);
+                } else if (tool === "erase") {
+                  snapshot();
+                  erase(event);
+                } else boxStart.current = pointAt(event);
               }}
               onPointerMove={(event) => {
                 if (!painting.current) return;
@@ -284,18 +327,25 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
               Everything
             </Button>
             <span className="ml-auto flex items-center gap-2 text-ink-500">
+              <Button size="sm" variant={tool === "magic" ? "primary" : "secondary"} onClick={() => setTool("magic")} className="gap-1.5">
+                <Sparkles className="size-4" /> Magic eraser
+              </Button>
               <Button size="sm" variant={tool === "area" ? "primary" : "secondary"} onClick={() => setTool("area")} className="gap-1.5">
                 <Crop className="size-4" /> Keep area
               </Button>
               <Button size="sm" variant={tool === "erase" ? "primary" : "secondary"} onClick={() => setTool("erase")} className="gap-1.5">
                 <Eraser className="size-4" /> Eraser
               </Button>
-              <input type="range" min="6" max="110" value={brush} onChange={(event) => setBrush(Number(event.target.value))} aria-label="Eraser size" className="w-24 accent-ink-800" />
+              {tool === "erase" && <input type="range" min="6" max="110" value={brush} onChange={(event) => setBrush(Number(event.target.value))} aria-label="Eraser size" className="w-24 accent-ink-800" />}
             </span>
+            <Button size="sm" variant="ghost" onClick={undo} disabled={!canUndo} className="gap-1.5">
+              <Undo2 className="size-4" /> Undo
+            </Button>
             <Button
               size="sm"
               variant="ghost"
               onClick={() => {
+                snapshot();
                 state.current.erased.fill(0);
                 render(pieceIndex);
               }}
@@ -305,7 +355,7 @@ export default function CutoutTool({ open, onClose, onDone, saving, images = [],
             </Button>
           </div>
           <p className="text-xs text-ink-400">
-            {type === "earring" ? "Keep ONE earring only (the other ear is mirrored in the shop)." : "Each Piece is one separate object in the photo. Keep the piece that is the product itself."} <strong>Keep area</strong>: drag a box around what you want. <strong>Eraser</strong>: rub out leftovers such as the stand or a leaf.
+            {type === "earring" ? "Keep ONE earring only (the other ear is mirrored in the shop)." : "Each Piece is one separate object in the photo. Keep the piece that is the product itself."} <strong>Magic eraser</strong>: click a leftover (a bit of the stand, a patch of background) to remove it in one go. <strong>Keep area</strong>: drag a box around what you want. <strong>Eraser</strong>: rub out anything else.
           </p>
         </div>
 

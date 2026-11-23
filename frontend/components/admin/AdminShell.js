@@ -113,9 +113,13 @@ export default function AdminShell({ children }) {
   );
 
   const brand = (
-    <Link href="/admin" className="flex items-baseline gap-2 px-6 py-5">
-      <span className="font-display text-2xl text-ink-900">Nakshazz</span>
-      <span className="text-[10px] font-semibold tracking-[0.2em] text-gold-600 uppercase">Admin</span>
+    <Link href="/admin" className="flex items-center gap-3 px-5 py-4">
+      {/* eslint-disable-next-line @next/next/no-img-element -- small static brand badge */}
+      <img src="/brand/logo-badge-320.webp" alt="" className="size-11 shrink-0" />
+      <span className="leading-tight">
+        <span className="block font-display text-2xl text-ink-900">Nakshazz</span>
+        <span className="block text-[10px] font-semibold tracking-[0.2em] text-gold-600 uppercase">Admin</span>
+      </span>
     </Link>
   );
 
@@ -134,7 +138,11 @@ export default function AdminShell({ children }) {
           <Menu className="size-5" />
           {alerts?.total > 0 && <span className="absolute top-1.5 right-1.5 size-2.5 rounded-full bg-red-600 ring-2 ring-white" />}
         </button>
-        <span className="font-display text-xl text-ink-900">Nakshazz</span>
+        <Link href="/admin" className="flex items-center gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element -- small static brand badge */}
+          <img src="/brand/logo-badge-320.webp" alt="" className="size-8" />
+          <span className="font-display text-xl text-ink-900">Nakshazz</span>
+        </Link>
         <Link href="/admin/sales/new" className="-mr-2 rounded-md p-2 text-gold-600" aria-label="New sale">
           <BadgeDollarSign className="size-5" />
         </Link>

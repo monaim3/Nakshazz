@@ -198,7 +198,10 @@ html[lang="bn"] .italic {
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; }
+  /* keep the invoice's navy header, gradient and stamp colours on paper */
+  .invoice, .invoice * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+@page { size: A4; margin: 10mm; }
 
 /* Falling petals on section sides (components/store/FallingPetals.js) (defined outside @theme so Tailwind always emits them) */
 @keyframes petal-fall {

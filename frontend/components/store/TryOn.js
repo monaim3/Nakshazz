@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Download, ImageUp, Loader2, RotateCcw, Sparkles, X } from "lucide-react";
+import { Camera, Download, ImageUp, Loader2, RotateCcw, Sparkles, Sun, X } from "lucide-react";
 
 /*
  * Virtual try-on. Google MediaPipe Face Landmarker finds 478 face points on the device
@@ -179,22 +179,102 @@ function computePlacement(landmarks, width, height, mirror, pose) {
     down,
     chin,
     neck,
+    // cheeks and nose: where the light on the face is read (see sampleSkin)
+    skin: [pt(50), pt(280), pt(5)],
     lobes: { right: lobe(P.rightJawUpper, P.rightJawLower, right), left: lobe(P.leftJawUpper, P.leftJawLower, left) },
     nostrils: { right: nostril(P.rightNostril), left: nostril(P.leftNostril) },
   };
 }
 
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+// Canvas filters (brightness, blur...) are missing in Safari before 18: the try-on then
+// simply skips the light matching and studio light.
+const FILTERS = typeof document !== "undefined" && typeof document.createElement("canvas").getContext("2d")?.filter === "string";
+
+let spriteCanvas = null;
+
+/**
+ * The piece at its final size, lit like the scene: brightness matched to the face, a touch of
+ * the skin's colour (the light in the room falls on the metal too) and a soft sheen.
+ * Drawn once per frame and reused for both earrings.
+ */
+function renderSprite(art, w, h, look) {
+  const W = Math.max(1, Math.ceil(w));
+  const H = Math.max(1, Math.ceil(h));
+  spriteCanvas ||= document.createElement("canvas");
+  spriteCanvas.width = W;
+  spriteCanvas.height = H;
+  const c = spriteCanvas.getContext("2d");
+  c.imageSmoothingQuality = "high";
+  if (look && FILTERS) c.filter = look.filter;
+  c.drawImage(art.img, art.box.x, art.box.y, art.box.w, art.box.h, 0, 0, W, H);
+  c.filter = "none";
+  if (look) {
+    c.globalCompositeOperation = "source-atop";
+    c.globalAlpha = look.tintAlpha;
+    c.fillStyle = look.tint;
+    c.fillRect(0, 0, W, H);
+    c.globalAlpha = 1;
+    const sheen = c.createLinearGradient(0, 0, W, H);
+    sheen.addColorStop(0, "rgba(255,255,255,0.12)");
+    sheen.addColorStop(0.5, "rgba(255,255,255,0)");
+    sheen.addColorStop(1, "rgba(0,0,0,0.12)");
+    c.fillStyle = sheen;
+    c.fillRect(0, 0, W, H);
+  }
+  return spriteCanvas;
+}
+
+/** A soft four-ray glint, like light catching metal or stone. */
+function drawGlint(ctx, x, y, size, alpha) {
+  if (alpha < 0.02) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha = alpha;
+  const glow = ctx.createRadialGradient(x, y, 0, x, y, size / 2);
+  glow.addColorStop(0, "rgba(255,250,235,0.95)");
+  glow.addColorStop(0.2, "rgba(255,236,190,0.4)");
+  glow.addColorStop(1, "rgba(255,236,190,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(x - size / 2, y - size / 2, size, size);
+  ctx.fillStyle = "rgba(255,252,240,0.75)";
+  for (const angle of [Math.PI / 4, -Math.PI / 4]) {
+    ctx.beginPath();
+    ctx.ellipse(x, y, size * 0.42, Math.max(0.5, size * 0.02), angle, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
 /** Draws the product on the canvas (already showing the face). */
-function drawPiece(ctx, piece, art, place, { scale, offset, noseSide }) {
+function drawPiece(ctx, piece, art, place, { scale, offset, noseSide, look = null, time = null, swing = null }) {
   // only the visible part of the photo is drawn: empty transparent margins would push the
   // piece away from the ear / neck and make it look too small
-  const { img, box } = art;
+  const { box, glints = [] } = art;
   const aspect = box.w / box.h;
-  const draw = (x, y, w, h) => ctx.drawImage(img, box.x, box.y, box.w, box.h, x, y, w, h);
+  let sprite = null;
+  const draw = (x, y, w, h) => {
+    sprite ||= renderSprite(art, w, h, look);
+    ctx.save();
+    // warm, soft shadow on the skin (not flat grey), and edges softened a little so the
+    // cut-out blends into a camera photo instead of looking pasted on
+    ctx.shadowColor = look?.shadow || "rgba(40,20,10,0.4)";
+    ctx.shadowBlur = Math.max(4, place.mmToPx * 1.6);
+    ctx.shadowOffsetY = Math.max(2, place.mmToPx * 0.8);
+    if (FILTERS) ctx.filter = "blur(0.3px)";
+    ctx.drawImage(sprite, x, y, w, h);
+    ctx.restore();
+    // glints: twinkling on camera, one gentle sparkle on a still photo. On a small piece a
+    // glint would read as a "+" mark rather than light, so it is left out.
+    if (Math.max(w, h) < 90) return;
+    const size = Math.max(w, h) * 0.16;
+    glints.forEach((glint, i) => {
+      const alpha = time === null ? (i === 0 ? 0.6 : 0) : Math.max(0, Math.sin(time / 650 + i * 2.3)) ** 6 * 0.85;
+      drawGlint(ctx, x + glint.x * w, y + glint.y * h, size, alpha);
+    });
+  };
   ctx.save();
-  ctx.shadowColor = "rgba(0,0,0,0.35)";
-  ctx.shadowBlur = Math.max(4, place.mmToPx * 1.2);
-  ctx.shadowOffsetY = Math.max(2, place.mmToPx * 0.6);
 
   if (piece.type === "earring") {
     const h = piece.size_mm * place.mmToPx * scale;
@@ -204,7 +284,8 @@ function drawPiece(ctx, piece, art, place, { scale, offset, noseSide }) {
       ctx.save();
       // the hook / stud top sits just above the lobe point (where it pierces the ear)
       ctx.translate(lobe.x, lobe.y + (offset - 0.06) * h);
-      ctx.rotate(place.roll * 0.15); // earrings hang with gravity, follow the head only slightly
+      // earrings hang with gravity, follow the head only slightly, and swing on camera
+      ctx.rotate(place.roll * 0.15 + (swing?.[lobe.side] || 0));
       if (lobe.side === "screenLeft") ctx.scale(-1, 1); // mirror the single earring for the other ear
       draw(-w / 2, 0, w, h);
       ctx.restore();
@@ -248,7 +329,7 @@ export default function TryOn({ product, t, onClose }) {
   const placeRef = useRef(null);
   const streamRef = useRef(null);
   const rafRef = useRef(0);
-  const settingsRef = useRef({ scale: 1, offset: 0, noseSide: "left" });
+  const settingsRef = useRef({ scale: 1, offset: 0, noseSide: "left", studio: true });
 
   const [mode, setMode] = useState("choose"); // choose | loading | camera | photo
   const [error, setError] = useState("");
@@ -256,16 +337,23 @@ export default function TryOn({ product, t, onClose }) {
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState(0);
   const [noseSide, setNoseSide] = useState("left");
+  const [studio, setStudio] = useState(FILTERS);
 
   useEffect(() => {
-    settingsRef.current = { scale, offset, noseSide };
-  }, [scale, offset, noseSide]);
+    settingsRef.current = { scale, offset, noseSide, studio };
+  }, [scale, offset, noseSide, studio]);
 
   // product photo (same-origin via /media so the canvas can be saved)
   useEffect(() => {
     const img = new Image();
     img.src = `/media/${piece.image_path}`;
-    img.decode().then(() => (imgRef.current = { img, box: visibleBox(img) })).catch(() => setError(t.errorPiece));
+    img
+      .decode()
+      .then(() => {
+        const box = visibleBox(img);
+        imgRef.current = { img, box, glints: findGlints(img, box) };
+      })
+      .catch(() => setError(t.errorPiece));
   }, [piece.image_path, t.errorPiece]);
 
   const stopCamera = useCallback(() => {
@@ -281,14 +369,23 @@ export default function TryOn({ product, t, onClose }) {
     const canvas = canvasRef.current;
     const photo = photoRef.current;
     if (!canvas || !photo) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    const place = placeRef.current;
+    const settings = settingsRef.current;
     ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
-    if (placeRef.current && imgRef.current) drawPiece(ctx, piece, imgRef.current, placeRef.current, settingsRef.current);
+    if (settings.studio && FILTERS) {
+      const grade = gradeFromSkin(place ? sampleSkin(ctx, place) : null);
+      ctx.filter = grade;
+      ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
+      ctx.filter = "none";
+      finishStudio(ctx, canvas.width, canvas.height);
+    }
+    if (place && imgRef.current) drawPiece(ctx, piece, imgRef.current, place, { ...settings, look: lookFromSkin(sampleSkin(ctx, place)) });
   }, [piece]);
 
   useEffect(() => {
     if (mode === "photo") redrawPhoto();
-  }, [mode, scale, offset, noseSide, redrawPhoto]);
+  }, [mode, scale, offset, noseSide, studio, redrawPhoto]);
 
   async function startWithPhoto(file) {
     if (!file) return;
@@ -349,29 +446,48 @@ export default function TryOn({ product, t, onClose }) {
       const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
       setMode("camera");
 
       let smooth = null;
-      const loop = () => {
-        if (!streamRef.current) return;
-        // mirrored like a real mirror
+      let grade = gradeFromSkin(null);
+      let look = null;
+      const swingState = {};
+      // mirrored like a real mirror
+      const drawFrame = (filter) => {
         ctx.save();
         ctx.translate(canvas.width, 0);
         ctx.scale(-1, 1);
+        ctx.filter = filter;
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
+      };
+      const loop = () => {
+        if (!streamRef.current) return;
+        const settings = settingsRef.current;
+        const studioOn = settings.studio && FILTERS;
+        // light is read a few times a second, not every frame
+        const sampleNow = frame % 12 === 0;
+        if (studioOn && sampleNow && smooth) {
+          drawFrame("none");
+          grade = gradeFromSkin(sampleSkin(ctx, smooth));
+        }
+        drawFrame(studioOn ? grade : "none");
+        if (studioOn) finishStudio(ctx, canvas.width, canvas.height);
         const now = performance.now();
         const result = landmarker.detectForVideo(video, now);
         const face = result.faceLandmarks?.[0];
         // shoulders move slowly: every third frame is enough and keeps the camera smooth
-        if (poser && frame++ % 3 === 0) pose = poser.detectForVideo(video, now).landmarks?.[0] || null;
+        if (poser && frame % 3 === 0) pose = poser.detectForVideo(video, now).landmarks?.[0] || null;
+        frame++;
         if (face) {
           const next = computePlacement(face, canvas.width, canvas.height, true, pose);
           // light smoothing so the piece does not jitter
           smooth = smooth ? blend(smooth, next, 0.45) : next;
           placeRef.current = smooth;
-          if (imgRef.current) drawPiece(ctx, piece, imgRef.current, smooth, settingsRef.current);
+          if (sampleNow || !look) look = lookFromSkin(sampleSkin(ctx, smooth));
+          const swing = piece.type === "earring" ? updateSwing(swingState, smooth, piece.size_mm * smooth.mmToPx * settings.scale) : null;
+          if (imgRef.current) drawPiece(ctx, piece, imgRef.current, smooth, { ...settings, look, time: now, swing });
         }
         setNoFace((current) => (current !== !face ? !face : current));
         rafRef.current = requestAnimationFrame(loop);
@@ -399,16 +515,63 @@ export default function TryOn({ product, t, onClose }) {
     setMode("photo");
   }
 
-  function download() {
-    canvasRef.current.toBlob((blob) => {
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `nakshazz-${product.slug}.png`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }, "image/png");
+  /** Saves the photo with a Nakshazz strip underneath (logo, piece name, website) for sharing. */
+  async function download() {
+    const photo = canvasRef.current;
+    const W = photo.width;
+    const H = photo.height;
+    const bar = Math.round(Math.max(72, W * 0.1));
+    const out = document.createElement("canvas");
+    out.width = W;
+    out.height = H + bar;
+    const c = out.getContext("2d");
+    c.drawImage(photo, 0, 0);
+    c.fillStyle = "#0a1226";
+    c.fillRect(0, H, W, bar);
+    const gold = c.createLinearGradient(0, 0, W, 0);
+    gold.addColorStop(0, "rgba(242,204,94,0)");
+    gold.addColorStop(0.5, "#f2cc5e");
+    gold.addColorStop(1, "rgba(242,204,94,0)");
+    c.fillStyle = gold;
+    c.fillRect(0, H, W, Math.max(2, Math.round(bar * 0.03)));
+
+    const pad = Math.round(bar * 0.16);
+    let textX = pad;
+    try {
+      const logo = new Image();
+      logo.src = "/brand/logo-badge-320.webp";
+      await logo.decode();
+      const lh = bar - pad * 2;
+      const lw = (lh * logo.naturalWidth) / logo.naturalHeight;
+      c.drawImage(logo, pad, H + pad, lw, lh);
+      textX = pad * 2 + lw;
+    } catch {
+      // no logo: the text alone still reads fine
+    }
+    const css = getComputedStyle(document.documentElement);
+    const serif = css.getPropertyValue("--font-cormorant").trim() || "Georgia, serif";
+    const sans = css.getPropertyValue("--font-jost").trim() || "system-ui, sans-serif";
+    c.textBaseline = "middle";
+    c.fillStyle = "#ffffff";
+    c.font = `500 ${Math.round(bar * 0.3)}px ${serif}`;
+    c.fillText(product.name, textX, H + bar * 0.4, W - textX - pad);
+    c.fillStyle = "#f2cc5e";
+    c.font = `400 ${Math.round(bar * 0.17)}px ${sans}`;
+    c.fillText("nakshazz.com", textX, H + bar * 0.72, W - textX - pad);
+
+    out.toBlob(
+      (blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `nakshazz-${product.slug}.jpg`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+      },
+      "image/jpeg",
+      0.92,
+    );
   }
 
   const showStage = mode === "camera" || mode === "photo" || mode === "loading";
@@ -477,6 +640,16 @@ export default function TryOn({ product, t, onClose }) {
             </label>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2">
+            {FILTERS && (
+              <button
+                type="button"
+                onClick={() => setStudio((on) => !on)}
+                aria-pressed={studio}
+                className={`flex h-11 items-center gap-2 rounded-full px-5 text-sm transition ${studio ? "bg-white text-navy-950" : "border border-white/25"}`}
+              >
+                <Sun className="size-4" /> {t.studio}
+              </button>
+            )}
             {piece.type === "nose" &&
               ["left", "right"].map((side) => (
                 <button key={side} type="button" onClick={() => setNoseSide(side)} className={`h-11 rounded-full px-5 text-sm transition ${noseSide === side ? "bg-white text-navy-950" : "border border-white/25"}`}>
@@ -501,7 +674,12 @@ export default function TryOn({ product, t, onClose }) {
         </div>
       )}
 
-      <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => startWithPhoto(event.target.files?.[0])} />
+      <input ref={fileRef} type="file" accept="image/*" hidden 
+        onChange={(event) => {
+          startWithPhoto(event.target.files?.[0]);
+          event.target.value = ""; // choosing the same photo again must still work
+        }}
+      />
     </div>
   );
 }
@@ -596,6 +774,126 @@ function visibleBox(img) {
   }
 }
 
+/** Average colour and brightness (0-1) of the skin at the cheeks and nose, or null. */
+function sampleSkin(ctx, place) {
+  const r = Math.max(3, Math.round(place.mmToPx * 4));
+  const { width, height } = ctx.canvas;
+  let sum = [0, 0, 0];
+  let n = 0;
+  for (const point of place.skin || []) {
+    const x = Math.round(clamp(point.x - r, 0, width - 1));
+    const y = Math.round(clamp(point.y - r, 0, height - 1));
+    const w = Math.min(r * 2, width - x);
+    const h = Math.min(r * 2, height - y);
+    if (w < 1 || h < 1) continue;
+    const data = ctx.getImageData(x, y, w, h).data;
+    for (let i = 0; i < data.length; i += 8) {
+      const lum = (0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]) / 255;
+      if (lum < 0.06 || lum > 0.97) continue; // hair, glare
+      sum = [sum[0] + data[i], sum[1] + data[i + 1], sum[2] + data[i + 2]];
+      n++;
+    }
+  }
+  if (!n) return null;
+  const [red, green, blue] = sum.map((value) => value / n);
+  return { r: red, g: green, b: blue, lum: (0.299 * red + 0.587 * green + 0.114 * blue) / 255 };
+}
+
+/** How the piece should be lit to sit in this scene. */
+function lookFromSkin(skin) {
+  if (!skin) return null;
+  const { r, g, b, lum } = skin;
+  // match the light level, but keep the jewellery rich: it is what the shopper came to see
+  const brightness = clamp(0.55 + lum * 0.8, 0.85, 1.06);
+  return {
+    filter: `brightness(${brightness.toFixed(3)}) contrast(1.03) saturate(1.06)`,
+    tint: `rgb(${r | 0},${g | 0},${b | 0})`,
+    tintAlpha: 0.06,
+    shadow: `rgba(${(r * 0.3) | 0},${(g * 0.2) | 0},${(b * 0.17) | 0},0.5)`,
+  };
+}
+
+/** Studio light: lifts a dim or flat photo towards well-lit skin, a little richer colour. */
+function gradeFromSkin(skin) {
+  const brightness = skin ? clamp(0.62 / Math.max(skin.lum, 0.05), 0.94, 1.35) : 1;
+  return `brightness(${brightness.toFixed(3)}) contrast(1.07) saturate(1.12)`;
+}
+
+/** Studio light finish: warm glow and a soft vignette that draws the eye to the face. */
+function finishStudio(ctx, w, h) {
+  ctx.save();
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.fillStyle = "rgba(255,190,140,0.2)";
+  ctx.fillRect(0, 0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+  const vignette = ctx.createRadialGradient(w / 2, h * 0.45, Math.min(w, h) * 0.38, w / 2, h * 0.45, Math.hypot(w, h) * 0.62);
+  vignette.addColorStop(0, "rgba(10,18,38,0)");
+  vignette.addColorStop(1, "rgba(10,18,38,0.36)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, w, h);
+  ctx.restore();
+}
+
+/**
+ * Earrings swing like a pendulum when the head moves: the lobe's sideways acceleration
+ * pushes the earring, a spring brings it back. Returns the angle per side.
+ */
+function updateSwing(state, place, length) {
+  const out = {};
+  for (const lobe of [place.lobes.right, place.lobes.left]) {
+    const s = (state[lobe.side] ||= { a: 0, v: 0, x: lobe.x, vx: 0 });
+    const vx = lobe.x - s.x;
+    const ax = vx - s.vx;
+    s.x = lobe.x;
+    s.vx = vx;
+    // head moves right -> the earring's bottom lags left (clockwise on the canvas)
+    s.v += -0.06 * s.a - 0.1 * s.v + (ax / Math.max(length, 1)) * 0.9;
+    s.a = clamp(s.a + s.v, -0.45, 0.45);
+    out[lobe.side] = s.a;
+  }
+  return out;
+}
+
+/**
+ * Brightest spots of the piece (polished metal, stones), as fractions of the visible box,
+ * spread apart: where the glints go.
+ */
+function findGlints(img, box) {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = box.w;
+    canvas.height = box.h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, box.x, box.y, box.w, box.h, 0, 0, box.w, box.h);
+    const data = ctx.getImageData(0, 0, box.w, box.h).data;
+    const N = 8;
+    const cells = [];
+    for (let cy = 0; cy < N; cy++) {
+      for (let cx = 0; cx < N; cx++) {
+        let best = { lum: 0, x: 0, y: 0 };
+        for (let y = Math.floor((cy * box.h) / N); y < ((cy + 1) * box.h) / N; y += 2) {
+          for (let x = Math.floor((cx * box.w) / N); x < ((cx + 1) * box.w) / N; x += 2) {
+            const i = (y * box.w + x) * 4;
+            if (data[i + 3] < 230) continue;
+            const lum = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            if (lum > best.lum) best = { lum, x, y };
+          }
+        }
+        if (best.lum > 190) cells.push({ lum: best.lum, x: best.x / box.w, y: best.y / box.h });
+      }
+    }
+    cells.sort((a, b) => b.lum - a.lum);
+    const picked = [];
+    for (const cell of cells) {
+      if (picked.every((p) => Math.hypot(p.x - cell.x, p.y - cell.y) > 0.3)) picked.push(cell);
+      if (picked.length === 3) break;
+    }
+    return picked;
+  } catch {
+    return [];
+  }
+}
+
 /** Weighted blend of two placements (camera smoothing). */
 function blend(a, b, k) {
   const mix = (x, y) => x + (y - x) * k;
@@ -609,5 +907,6 @@ function blend(a, b, k) {
     neck: a.neck && b.neck ? { ...mixPt(a.neck, b.neck), angle: mix(a.neck.angle, b.neck.angle) } : b.neck,
     lobes: { right: mixPt(a.lobes.right, b.lobes.right), left: mixPt(a.lobes.left, b.lobes.left) },
     nostrils: { right: mixPt(a.nostrils.right, b.nostrils.right), left: mixPt(a.nostrils.left, b.nostrils.left) },
+    skin: b.skin,
   };
 }

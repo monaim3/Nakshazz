@@ -330,6 +330,7 @@
     "left": "Left side",
     "right": "Right side",
     "capture": "Take photo",
+    "studio": "Studio light",
     "save": "Save photo",
     "again": "Try again",
     "errorLoad": "Could not load the try-on. Please check your connection and try again.",

@@ -68,6 +68,8 @@
     "quickView": "Quick view",
     "addToBag": "Add to bag",
     "added": "Added to bag",
+    "viewBag": "View bag",
+    "bagFull": "Most we can send of this is already in your bag",
     "viewDetails": "View full details",
     "inStock": "In stock",
     "onlyLeft": "Only :count left",

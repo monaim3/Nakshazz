@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { Check, Eye, Plus } from "lucide-react";
-import { addToCart, openCartDrawer } from "@/lib/cart-storage";
+import { addToCart, readCart } from "@/lib/cart-storage";
 import FavouriteButton from "./FavouriteButton";
 import QuickView from "./QuickView";
+import { showStoreToast } from "./StoreToaster";
 
 /**
  * Interactive layer on a product card: favourite heart and "+" add-to-bag (top right),
  * and a Quick view button that slides up on hover (always visible as an icon on touch screens).
- * "+" adds a single-variant product straight to the bag; with several variants it opens
- * quick view so the shopper can choose. The quick view popup is only mounted once opened.
+ * "+" adds one of the product (default colour) to the bag and shows a toast; nothing opens.
+ * The quick view popup is only mounted once opened.
  */
 export default function ProductCardActions({ product, lang, t }) {
   const [open, setOpen] = useState(false);
@@ -25,20 +26,22 @@ export default function ProductCardActions({ product, lang, t }) {
   function quickAdd(event) {
     event.preventDefault();
     event.stopPropagation();
-    if (!product.quick_add) {
-      showQuickView();
+    const { variant_id: variantId, max_quantity: max } = product.quick_add;
+    const before = readCart().find((line) => line.variantId === variantId)?.quantity || 0;
+    const now = addToCart(variantId, 1, max);
+    if (now === before) {
+      showStoreToast({ title: t.bagFull, text: product.name, tone: "info", bagLink: true });
       return;
     }
-    addToCart(product.quick_add.variant_id, 1, product.quick_add.max_quantity);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
-    openCartDrawer();
+    showStoreToast({ title: t.added, text: product.name, image: product.image?.urls?.sm, bagLink: true });
   }
 
   return (
     <>
       <FavouriteButton product={product} labels={t} className="absolute top-3 right-3 z-10" />
-      {product.in_stock && (
+      {product.quick_add && (
         <button
           type="button"
           onClick={quickAdd}

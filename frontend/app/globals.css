@@ -251,6 +251,15 @@ html[lang="bn"] .italic {
   to { transform: translateX(0); }
 }
 
+/* Shop toast pop-up (components/store/StoreToaster.js) */
+@keyframes toast-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.toast-in {
+  animation: toast-in 0.25s ease-out;
+}
+
 /* Phones: iOS Safari zooms the whole page when a focused field's text is under 16px. */
 @media (max-width: 640px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),

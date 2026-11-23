@@ -3,6 +3,7 @@ import Header from "@/components/store/Header";
 import Footer from "@/components/store/Footer";
 import WhatsAppButton from "@/components/store/WhatsAppButton";
 import CartDrawer from "@/components/store/CartDrawer";
+import StoreToaster from "@/components/store/StoreToaster";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { getCategories, getSettings } from "@/lib/storefront-api";
 import { LOCALES } from "@/lib/i18n";
@@ -50,6 +51,7 @@ export default async function StoreLayout({ children }) {
         <main id="main">{children}</main>
         <Footer lang={lang} dict={dict} store={store} categories={categories} />
         <CartDrawer lang={lang} t={dict.cart} />
+        <StoreToaster viewBagLabel={dict.product.viewBag} />
         <WhatsAppButton number={store.whatsapp_number} label={dict.nav.whatsapp} greeting={dict.nav.whatsappGreeting} />
       </body>
     </html>

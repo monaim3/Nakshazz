@@ -44,22 +44,26 @@ class ProductCardResource extends JsonResource
     }
 
     /**
-     * The one variant a card's "+" button can add straight to the bag. Null when the
-     * shopper must choose (several variants) or nothing can be bought.
+     * The variant a card's "+" button adds to the bag in one tap: the default variant when
+     * it can be bought, otherwise the cheapest one that can. Null when nothing can be bought.
      *
      * @return array{variant_id: int, max_quantity: int}|null
      */
     private function quickAdd(): ?array
     {
-        if ($this->activeVariants->count() !== 1) {
-            return null;
-        }
+        $buyable = $this->activeVariants
+            ->map(fn (ProductVariant $variant) => [
+                'variant' => $variant,
+                'max' => $variant->allow_backorder ? 10 : min(max(0, $variant->availableStock()), 10),
+            ])
+            ->filter(fn (array $option) => $option['max'] > 0)
+            ->sortBy([
+                fn (array $a, array $b) => (int) $b['variant']->is_default <=> (int) $a['variant']->is_default,
+                fn (array $a, array $b) => (float) $a['variant']->price <=> (float) $b['variant']->price,
+            ]);
 
-        /** @var ProductVariant $variant */
-        $variant = $this->activeVariants->first();
-        $available = max(0, $variant->availableStock());
-        $max = $variant->allow_backorder ? 10 : min($available, 10);
+        $choice = $buyable->first();
 
-        return $max > 0 ? ['variant_id' => $variant->id, 'max_quantity' => $max] : null;
+        return $choice ? ['variant_id' => $choice['variant']->id, 'max_quantity' => $choice['max']] : null;
     }
 }

@@ -6,10 +6,10 @@ import { adminFetch, ApiError, toQuery } from "@/lib/admin-api-client";
  * args: "/path" or { url, method, body, params }
  */
 async function adminBaseQuery(args, { signal }) {
-  const { url, method = "GET", body, params } = typeof args === "string" ? { url: args } : args;
+  const { url, method = "GET", body, params, idempotencyKey } = typeof args === "string" ? { url: args } : args;
 
   try {
-    const data = await adminFetch(`${url}${toQuery(params)}`, { method, body, signal });
+    const data = await adminFetch(`${url}${toQuery(params)}`, { method, body, signal, idempotencyKey });
     return { data };
   } catch (error) {
     if (error instanceof ApiError) {
@@ -25,7 +25,7 @@ export const adminApi = createApi({
   tagTypes: [
     "Me", "Dashboard", "Order", "Product", "Category", "Inventory", "Payment",
     "Customer", "Expense", "ExpenseCategory", "Coupon", "Report", "Review",
-    "Banner", "Page", "Settings", "User", "Message",
+    "Banner", "Page", "Settings", "User", "Message", "Closing", "Activity",
   ],
   refetchOnFocus: true,
   refetchOnReconnect: true,

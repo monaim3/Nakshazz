@@ -11,6 +11,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ReviewController extends Controller
 {
@@ -23,6 +24,9 @@ class ReviewController extends Controller
         return JsonResource::collection(
             Review::query()
                 ->with('product:id,name,slug')
+                // same text already posted in another review: likely a copy or a fake
+                ->select('reviews.*')
+                ->selectRaw('EXISTS (SELECT 1 FROM reviews AS other WHERE other.id <> reviews.id AND LOWER(TRIM(other.comment)) = LOWER(TRIM(reviews.comment))) AS possible_duplicate')
                 ->when($filters['status'] ?? null, fn (Builder $q, string $v) => $q->where('status', $v))
                 ->latest()
                 ->latest('id')
@@ -42,7 +46,15 @@ class ReviewController extends Controller
             'comment' => ['required', 'string', 'max:1000'],
             'source' => ['required', Rule::in(['website', 'facebook', 'instagram', 'whatsapp'])],
             'is_featured' => ['sometimes', 'boolean'],
+            'confirm_duplicate' => ['sometimes', 'boolean'],
         ], attributes: ['comment' => 'review']);
+
+        // the same review imported twice (my call 13): ask first
+        $copy = Review::query()->whereRaw('LOWER(TRIM(comment)) = ?', [mb_strtolower(trim($data['comment']))])->exists();
+        if ($copy && ! $request->boolean('confirm_duplicate')) {
+            throw ValidationException::withMessages(['duplicate' => ['A review with exactly this text is already saved. Save anyway?']]);
+        }
+        unset($data['confirm_duplicate']);
 
         $review = Review::query()->create([...$data, 'status' => ReviewStatus::Approved]);
         $this->revalidator->revalidate(['home', 'products']);

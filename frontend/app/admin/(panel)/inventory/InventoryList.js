@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Boxes, History, Search, SlidersHorizontal } from "lucide-react";
 import { useAdjustStockMutation, useInventoryQuery, useMovementsQuery } from "@/store/admin/catalogApi";
 import { useUrlFilters } from "@/components/admin/useUrlFilters";
+import { ExportButton } from "@/components/admin/AdminShell";
 import { formatDateTime, humanize } from "@/lib/format";
 import { Button, Card, Checkbox, cx, EmptyState, ErrorBlock, Input, LoadingBlock, Modal, PageHeader, Pagination, Select, Table, useToast } from "@/components/admin/ui";
 
@@ -37,7 +38,7 @@ export default function InventoryList() {
 
   return (
     <>
-      <PageHeader title="Inventory" description="Stock on hand, reserved for open orders, and available to sell. Every change is logged." />
+      <PageHeader title="Inventory" description="Stock on hand, reserved for open orders, and available to sell. Every change is logged." actions={<ExportButton type="inventory" />} />
 
       <Card padded={false}>
         <div className="flex flex-col gap-3 border-b border-ink-100 p-4 sm:flex-row sm:items-center">

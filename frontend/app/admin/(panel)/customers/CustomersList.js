@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { useCustomersQuery } from "@/store/admin/contentApi";
 import { useUrlFilters } from "@/components/admin/useUrlFilters";
+import { ExportButton } from "@/components/admin/AdminShell";
 import { formatBDT, formatDate } from "@/lib/format";
 import { Card, cx, EmptyState, ErrorBlock, LoadingBlock, PageHeader, Pagination, Table } from "@/components/admin/ui";
 
@@ -25,7 +26,7 @@ export default function CustomersList() {
 
   return (
     <>
-      <PageHeader title="Customers" description="Everyone who ordered from the website or a manual sale, matched by phone number." />
+      <PageHeader title="Customers" description="Everyone who ordered from the website or a manual sale, matched by phone number." actions={<ExportButton type="customers" />} />
 
       <Card padded={false}>
         <div className="border-b border-ink-100 p-4">

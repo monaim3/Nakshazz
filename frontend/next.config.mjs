@@ -7,6 +7,8 @@ const nextConfig = {
   // Built on Windows, served on Linux: skip the native image optimiser (sharp). Our images are
   // already optimised WebP from the API and small brand assets.
   images: { unoptimized: true },
+  // Don't advertise the framework in every response.
+  poweredByHeader: false,
   cacheComponents: true,
   // Shared hosting throttles bursts of API requests: prerender gently, retry failed pages.
   experimental: {
@@ -25,7 +27,17 @@ const nextConfig = {
   // only hold versioned artwork and the try-on models: let browsers keep them for a month.
   async headers() {
     const month = [{ key: "Cache-Control", value: "public, max-age=2592000" }];
+    // Security headers on every route. Camera stays allowed for our own pages: the virtual
+    // try-on uses it. HSTS is ignored by browsers on plain-http localhost.
+    const security = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+    ];
     return [
+      { source: "/:path*", headers: security },
       { source: "/hero/:path*", headers: month },
       { source: "/brand/:path*", headers: month },
       { source: "/tryon/:path*", headers: month },

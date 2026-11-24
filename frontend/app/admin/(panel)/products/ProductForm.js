@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -141,6 +142,11 @@ function toPayload(values, isOwner) {
   };
 }
 
+// Server errors for a variant row that have no input of their own on the row.
+const ROW_ERROR_KEYS = ["options", "title", "id", "is_active", "allow_backorder", "sort_order"];
+
+const isZeroPrice = (value) => value !== "" && value != null && !Number.isNaN(Number(value)) && Number(value) === 0;
+
 export default function ProductForm({ product, imagesSlot, onCreated }) {
   const router = useRouter();
   const isOwner = useIsOwner();
@@ -164,6 +170,9 @@ export default function ProductForm({ product, imagesSlot, onCreated }) {
   const seoTitle = useWatch({ control, name: "seo_title" }) || "";
   const seoDescription = useWatch({ control, name: "seo_description" }) || "";
   const hasOptions = optionNames.some((name) => name.trim());
+  // a ৳0 price is refused by the server unless the owner confirms the piece is meant to be free
+  const [freeConfirmed, setFreeConfirmed] = useState(false);
+  const hasFreePrice = (variants || []).some((variant) => isZeroPrice(variant?.price));
 
   const categories = (categoryData?.data || []).map((category) => ({
     value: String(category.id),
@@ -178,6 +187,7 @@ export default function ProductForm({ product, imagesSlot, onCreated }) {
 
     try {
       const payload = toPayload(values, isOwner);
+      if (freeConfirmed && values.variants.some((variant) => isZeroPrice(variant.price))) payload.allow_free_price = true;
       if (product) {
         await updateProduct({ id: product.id, ...payload }).unwrap();
         notify("Product saved.");
@@ -239,6 +249,7 @@ export default function ProductForm({ product, imagesSlot, onCreated }) {
               const totalCost = ["raw_material_cost", "labour_cost", "packaging_cost", "other_cost"].reduce((sum, key) => sum + Number(variant[key] || 0), 0);
               const margin = Number(variant.price || 0) - totalCost;
               const variantErrors = errors.variants?.[index] || {};
+              const rowErrors = ROW_ERROR_KEYS.map((key) => variantErrors[key]?.message).filter(Boolean);
 
               return (
                 <li key={field.id} className="space-y-4 p-5">
@@ -263,17 +274,23 @@ export default function ProductForm({ product, imagesSlot, onCreated }) {
                     <Input label="Price (৳)" required type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.price?.message} {...register(`variants.${index}.price`)} />
                     <Input label="Compare-at price" hint="Old price, shown struck through." type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.compare_at_price?.message} {...register(`variants.${index}.compare_at_price`)} />
                     <Input label="SKU" hint="Leave empty to auto-generate." error={variantErrors.sku?.message} {...register(`variants.${index}.sku`)} />
-                    {!variant.id && !madeToOrder && <Input label="Opening stock" type="number" min="0" inputMode="numeric" {...register(`variants.${index}.initial_stock`)} />}
-                    <Input label="Low-stock alert at" type="number" min="0" inputMode="numeric" placeholder="Store default" {...register(`variants.${index}.low_stock_threshold`)} />
+                    {!variant.id && !madeToOrder && <Input label="Opening stock" type="number" min="0" inputMode="numeric" error={variantErrors.initial_stock?.message} {...register(`variants.${index}.initial_stock`)} />}
+                    <Input label="Low-stock alert at" type="number" min="0" inputMode="numeric" placeholder="Store default" error={variantErrors.low_stock_threshold?.message} {...register(`variants.${index}.low_stock_threshold`)} />
                   </div>
+
+                  {rowErrors.length > 0 && (
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                      {rowErrors.join(" ")}
+                    </p>
+                  )}
 
                   {isOwner && (
                     <div className="rounded-lg bg-cream-100 p-3">
                       <div className="grid gap-3 sm:grid-cols-4">
-                        <Input label="Raw material" type="number" min="0" step="0.01" inputMode="decimal" {...register(`variants.${index}.raw_material_cost`)} />
-                        <Input label="Labour" type="number" min="0" step="0.01" inputMode="decimal" {...register(`variants.${index}.labour_cost`)} />
-                        <Input label="Packaging" type="number" min="0" step="0.01" inputMode="decimal" {...register(`variants.${index}.packaging_cost`)} />
-                        <Input label="Other" type="number" min="0" step="0.01" inputMode="decimal" {...register(`variants.${index}.other_cost`)} />
+                        <Input label="Raw material" type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.raw_material_cost?.message} {...register(`variants.${index}.raw_material_cost`)} />
+                        <Input label="Labour" type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.labour_cost?.message} {...register(`variants.${index}.labour_cost`)} />
+                        <Input label="Packaging" type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.packaging_cost?.message} {...register(`variants.${index}.packaging_cost`)} />
+                        <Input label="Other" type="number" min="0" step="0.01" inputMode="decimal" error={variantErrors.other_cost?.message} {...register(`variants.${index}.other_cost`)} />
                       </div>
                       <p className="mt-2 flex flex-wrap gap-x-4 text-xs text-ink-600">
                         <span>
@@ -290,6 +307,19 @@ export default function ProductForm({ product, imagesSlot, onCreated }) {
               );
             })}
           </ul>
+
+          {(errors.variants?.message || errors.variants?.root?.message) && <p className="border-t border-ink-100 px-5 py-3 text-sm text-red-600">{errors.variants.message || errors.variants.root.message}</p>}
+
+          {hasFreePrice && (
+            <div className="border-t border-ink-100 bg-amber-50 px-5 py-3">
+              <Checkbox
+                label="Free item (price ৳0 is intended)"
+                hint="Leave unticked if ৳0 is a typo — the shop would give this piece away."
+                checked={freeConfirmed}
+                onChange={(event) => setFreeConfirmed(event.target.checked)}
+              />
+            </div>
+          )}
 
           {hasOptions && (
             <div className="border-t border-ink-100 p-4">

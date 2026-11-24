@@ -37,6 +37,7 @@ class PaymentResource extends JsonResource
             'note' => $this->note,
             'verified_at' => $this->verified_at?->toIso8601String(),
             'paid_at' => $this->paid_at?->toIso8601String(),
+            'created_at' => $this->created_at?->toIso8601String(),
         ];
     }
 }

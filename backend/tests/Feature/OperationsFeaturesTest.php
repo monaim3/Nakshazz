@@ -226,6 +226,24 @@ class OperationsFeaturesTest extends TestCase
         $this->assertSame(1, Order::query()->count());
     }
 
+    #[Test]
+    public function the_same_review_or_refund_twice_asks_before_saving(): void
+    {
+        $this->actingAs($this->owner);
+        $review = ['customer_name' => 'Rina', 'rating' => 5, 'comment' => 'Beautiful jhumka, loved it', 'source' => 'facebook'];
+
+        $this->postJson('/api/v1/admin/reviews', $review)->assertCreated();
+        $this->postJson('/api/v1/admin/reviews', [...$review, 'comment' => '  beautiful jhumka, LOVED it '])->assertJsonValidationErrors('duplicate');
+        $this->postJson('/api/v1/admin/reviews', [...$review, 'confirm_duplicate' => true])->assertCreated();
+        $this->assertEquals([1, 1], collect($this->getJson('/api/v1/admin/reviews')->json('data'))->pluck('possible_duplicate')->all());
+
+        $order = $this->deliveredCodOrder();
+        $refund = ['amount' => '100', 'method' => 'cash', 'note' => 'Late'];
+        $this->postJson("/api/v1/admin/orders/{$order->id}/refunds", $refund)->assertCreated();
+        $this->postJson("/api/v1/admin/orders/{$order->id}/refunds", $refund)->assertJsonValidationErrors('duplicate');
+        $this->postJson("/api/v1/admin/orders/{$order->id}/refunds", [...$refund, 'confirm_duplicate' => true])->assertCreated();
+    }
+
     private function variant(int $stock, string $price = '1000.00'): ProductVariant
     {
         return ProductVariant::factory()

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Info } from "lucide-react";
 import { useReportChannelsQuery, useReportMonthlyQuery, useReportProductsQuery, useReportSummaryQuery } from "@/store/admin/ownerApi";
 import { useUrlFilters } from "@/components/admin/useUrlFilters";
+import { ExportButton } from "@/components/admin/AdminShell";
 import MonthlyChart from "@/components/admin/MonthlyChart";
 import { formatBDT, humanize, todayISO } from "@/lib/format";
 import { SALES_CHANNELS } from "@/lib/admin-options";
@@ -57,7 +58,14 @@ export default function Reports() {
 
   return (
     <>
-      <PageHeader title="Sales & profit" description="Profit counts only completed sales (delivered). Costs are taken from what each item cost when it was sold, so later price or cost changes never alter these numbers." />
+      <PageHeader title="Sales & profit" description="Profit counts only completed sales (delivered). Costs are taken from what each item cost when it was sold, so later price or cost changes never alter these numbers."
+        actions={
+          <>
+            <ExportButton type="products" params={range} label="Export products" />
+            <ExportButton type="payments" params={range} label="Export payments" />
+          </>
+        }
+      />
 
       <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-end">
         <div className="inline-flex flex-wrap gap-1 rounded-lg bg-white p-1 ring-1 ring-ink-100" role="group" aria-label="Date range">

@@ -28,12 +28,13 @@ export const ordersApi = adminApi.injectEndpoints({
       query: ({ id, body }) => ({ url: `/admin/orders/${id}/notes`, method: "POST", body: { body } }),
       invalidatesTags: (result, error, { id }) => [{ type: "Order", id }],
     }),
+    // write mutations take an optional `idempotencyKey` (see newIdempotencyKey)
     returnOrderItems: build.mutation({
-      query: ({ id, ...body }) => ({ url: `/admin/orders/${id}/returns`, method: "POST", body }),
+      query: ({ id, idempotencyKey, ...body }) => ({ url: `/admin/orders/${id}/returns`, method: "POST", body, idempotencyKey }),
       invalidatesTags: affected,
     }),
     createManualSale: build.mutation({
-      query: (body) => ({ url: "/admin/manual-sales", method: "POST", body }),
+      query: ({ idempotencyKey, ...body }) => ({ url: "/admin/manual-sales", method: "POST", body, idempotencyKey }),
       invalidatesTags: affected,
     }),
 
@@ -42,11 +43,12 @@ export const ordersApi = adminApi.injectEndpoints({
       providesTags: ["Payment"],
     }),
     recordPayment: build.mutation({
-      query: ({ orderId, ...body }) => ({ url: `/admin/orders/${orderId}/payments`, method: "POST", body }),
+      query: ({ orderId, idempotencyKey, ...body }) => ({ url: `/admin/orders/${orderId}/payments`, method: "POST", body, idempotencyKey }),
       invalidatesTags: affected,
     }),
     verifyPayment: build.mutation({
-      query: ({ id, fee }) => ({ url: `/admin/payments/${id}/verify`, method: "POST", body: { fee } }),
+      // amount = what really arrived (when the customer sent less or more)
+      query: ({ id, fee, amount }) => ({ url: `/admin/payments/${id}/verify`, method: "POST", body: { fee, amount } }),
       invalidatesTags: affected,
     }),
     rejectPayment: build.mutation({
@@ -54,8 +56,8 @@ export const ordersApi = adminApi.injectEndpoints({
       invalidatesTags: affected,
     }),
     refundOrder: build.mutation({
-      query: ({ orderId, ...body }) => ({ url: `/admin/orders/${orderId}/refunds`, method: "POST", body }),
-      invalidatesTags: affected,
+      query: ({ orderId, idempotencyKey, ...body }) => ({ url: `/admin/orders/${orderId}/refunds`, method: "POST", body, idempotencyKey }),
+      invalidatesTags: [...affected, "Closing"],
     }),
 
     /** Product search for the POS screen (variants include live stock). */

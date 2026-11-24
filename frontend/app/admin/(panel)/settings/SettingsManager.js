@@ -8,7 +8,7 @@ import { formatBDT } from "@/lib/format";
 import { Button, Card, Checkbox, ErrorBlock, Input, LoadingBlock, PageHeader, Select, Textarea, useToast } from "@/components/admin/ui";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-const BOOLEAN_KEYS = ["cod_enabled", "bkash_enabled"];
+const BOOLEAN_KEYS = ["cod_enabled", "bkash_enabled", "sms_enabled", "sms_on_confirmed", "sms_on_shipped", "sms_on_delivered"];
 
 export default function SettingsManager() {
   const { data, error, isLoading, refetch } = useSettingsQuery();
@@ -36,6 +36,7 @@ function SettingsForm({ settings }) {
   const { notify } = useToast();
   const [errors, setErrors] = useState({});
   const [bkashEnabled, setBkashEnabled] = useState(Boolean(settings.bkash_enabled));
+  const [smsEnabled, setSmsEnabled] = useState(Boolean(settings.sms_enabled));
 
   async function submit(event) {
     event.preventDefault();
@@ -106,6 +107,50 @@ function SettingsForm({ settings }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Input name="order_notification_email" label="Email new orders to" type="email" defaultValue={settings.order_notification_email || ""} error={errors.order_notification_email} />
           <Input name="low_stock_threshold" label="Low-stock warning at" type="number" min="0" inputMode="numeric" defaultValue={settings.low_stock_threshold ?? 3} hint="Can be changed per product variant." error={errors.low_stock_threshold} />
+          <Input
+            name="reorder_cover_days"
+            label="Restock suggestions cover (days)"
+            type="number"
+            min="1"
+            max="365"
+            inputMode="numeric"
+            defaultValue={settings.reorder_cover_days ?? 30}
+            hint="Restock suggestions cover this many days of sales."
+            error={errors.reorder_cover_days}
+          />
+        </div>
+      </Card>
+
+      <Card title="Staff limits">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Input
+            name="staff_max_discount_percent"
+            label="Largest discount staff can give (%)"
+            type="number"
+            min="0"
+            max="100"
+            inputMode="numeric"
+            defaultValue={settings.staff_max_discount_percent ?? 20}
+            hint="Staff can give at most this % off the list price, and never below cost. The owner has no limit."
+            error={errors.staff_max_discount_percent}
+          />
+        </div>
+      </Card>
+
+      <Card title="SMS to customers">
+        <div className="space-y-4">
+          <Checkbox name="sms_enabled" label="Send SMS updates to customers" checked={smsEnabled} onChange={(event) => setSmsEnabled(event.target.checked)} />
+          <div className={smsEnabled ? "space-y-3 rounded-lg bg-cream-100 p-4" : "hidden"}>
+            <Checkbox name="sms_on_confirmed" label="When the order is confirmed" defaultChecked={Boolean(settings.sms_on_confirmed)} />
+            <Checkbox name="sms_on_shipped" label="When the order is shipped" defaultChecked={Boolean(settings.sms_on_shipped)} />
+            <Checkbox name="sms_on_delivered" label="When the order is delivered" defaultChecked={Boolean(settings.sms_on_delivered)} />
+          </div>
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            SMS also needs an SMS gateway set up in the server <code>.env</code> file: <code>SMS_DRIVER=http</code>, <code>SMS_API_URL</code>, <code>SMS_API_KEY</code> and <code>SMS_SENDER_ID</code>. While <code>SMS_DRIVER=log</code>, nothing is really sent — messages are only written to the server log.
+          </p>
+          {(errors.sms_enabled || errors.sms_on_confirmed || errors.sms_on_shipped || errors.sms_on_delivered) && (
+            <p className="text-xs text-red-600">{errors.sms_enabled || errors.sms_on_confirmed || errors.sms_on_shipped || errors.sms_on_delivered}</p>
+          )}
         </div>
       </Card>
 

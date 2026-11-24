@@ -3,11 +3,17 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowRight, Loader2, Minus, Plus, ShoppingBag, Trash2, X } from "lucide-react";
-import { onCartDrawerOpen, removeFromCart, setCartQuantity, useCart } from "@/lib/cart-storage";
+import { lineMax, onCartDrawerOpen, removeFromCart, setCartQuantity, syncCartWithQuote, useCart } from "@/lib/cart-storage";
 import { localePath, localizeDigits } from "@/lib/i18n";
 import { formatPrice } from "./Price";
 
 const API = process.env.NEXT_PUBLIC_API_URL;
+
+/** "Price changed from ৳X to ৳Y" (dictionary text when present, else a built-in fallback). */
+export function priceChangedText(t, lang, from, to) {
+  const template = t?.priceChanged || (lang === "bn" ? "দাম :from থেকে :to হয়েছে" : "Price changed from :from to :to");
+  return template.replace(":from", formatPrice(from, lang)).replace(":to", formatPrice(to, lang));
+}
 
 /**
  * Bag drawer (right side). Mounted once in the store layout; opens from the header bag icon
@@ -21,6 +27,8 @@ export default function CartDrawer({ lang, t }) {
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  // variantId -> { from, to } for prices that changed since the shopper added the piece
+  const [priceNotes, setPriceNotes] = useState({});
 
   useEffect(() => onCartDrawerOpen(() => setOpen(true)), []);
 
@@ -48,8 +56,10 @@ export default function CartDrawer({ lang, t }) {
         .then(({ data }) => {
           setQuote(data);
           setFailed(false);
-          // stock is lower than requested: bring the bag down to what is available
-          data.lines.filter((line) => line.problem === "insufficient_stock" && line.quantity > 0).forEach((line) => setCartQuantity(line.variant_id, line.quantity));
+          // remember today's prices (and say so when one moved); stock is lower than
+          // requested: bring the bag down to what is available
+          const changes = syncCartWithQuote(data.lines);
+          if (changes.length) setPriceNotes((notes) => ({ ...notes, ...Object.fromEntries(changes.map((change) => [change.variantId, change])) }));
         })
         .catch((reason) => reason.name !== "AbortError" && setFailed(true))
         .finally(() => setLoading(false));
@@ -70,7 +80,10 @@ export default function CartDrawer({ lang, t }) {
   return (
     <dialog
       ref={dialogRef}
-      onClose={() => setOpen(false)}
+      onClose={() => {
+        setOpen(false);
+        setPriceNotes({});
+      }}
       onClick={(event) => event.target === dialogRef.current && setOpen(false)}
       className="m-0 ml-auto h-dvh max-h-none w-full max-w-md bg-transparent p-0 backdrop:bg-navy-950/50 backdrop:backdrop-blur-[2px] open:animate-[drawer-in_0.35s_cubic-bezier(.2,.8,.25,1)]"
       aria-label={t.title}
@@ -104,6 +117,8 @@ export default function CartDrawer({ lang, t }) {
               {lines.map((line) => {
                 const info = byId.get(line.variantId);
                 const problem = info?.problem;
+                const note = priceNotes[line.variantId];
+                const atMax = line.quantity >= lineMax(line) || problem === "insufficient_stock";
                 const href = info?.product_slug ? localePath(lang, `/product/${info.product_slug}`) : null;
                 return (
                   <li key={line.variantId} className="flex gap-4 py-5">
@@ -130,6 +145,12 @@ export default function CartDrawer({ lang, t }) {
                         </button>
                       </div>
 
+                      {note && Number(note.to) === Number(info?.unit_price ?? note.to) && (
+                        <p className="mt-1.5 flex items-center gap-1 text-xs text-marigold-700" role="status">
+                          <AlertCircle className="size-3.5 shrink-0" />
+                          {priceChangedText(t, lang, note.from, note.to)}
+                        </p>
+                      )}
                       {problem && (
                         <p className="mt-1.5 flex items-center gap-1 text-xs text-lotus-600">
                           <AlertCircle className="size-3.5 shrink-0" />
@@ -149,7 +170,8 @@ export default function CartDrawer({ lang, t }) {
                             <button
                               type="button"
                               onClick={() => setCartQuantity(line.variantId, line.quantity + 1)}
-                              disabled={problem === "insufficient_stock"}
+                              disabled={atMax}
+                              title={atMax ? t.maxReached || (lang === "bn" ? "স্টকে আর নেই" : "No more in stock") : undefined}
                               className="flex size-9 items-center justify-center text-navy-900 disabled:opacity-30"
                               aria-label={t.increase}
                             >

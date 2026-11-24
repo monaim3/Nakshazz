@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Paperclip, Plus, Receipt, Settings2 } from "lucide-react";
 import { useDeleteExpenseMutation, useExpenseCategoriesQuery, useExpensesQuery, useSaveExpenseCategoryMutation, useSaveExpenseMutation } from "@/store/admin/ownerApi";
 import { useUrlFilters } from "@/components/admin/useUrlFilters";
+import { ExportButton } from "@/components/admin/AdminShell";
 import { formatBDT, formatDate, todayISO } from "@/lib/format";
 import { Badge, Button, Card, Checkbox, cx, EmptyState, ErrorBlock, Input, LoadingBlock, Modal, PageHeader, Pagination, Select, Table, Textarea, useToast } from "@/components/admin/ui";
 
@@ -34,6 +35,7 @@ export default function ExpensesManager() {
         description="Business costs that are not part of a product's cost: ads, rent, salaries, bills. These reduce net profit."
         actions={
           <>
+            <ExportButton type="expenses" params={monthRange(month)} />
             <Button variant="secondary" onClick={() => setManagingCategories(true)}>
               <Settings2 className="size-4" /> Categories
             </Button>
@@ -117,12 +119,31 @@ function ExpenseModal({ expense, categories, onClose }) {
     if (!formData.get("attachment")?.size) formData.delete("attachment");
 
     try {
-      await save({ id: expense?.id, formData }).unwrap();
-      notify("Expense saved.");
-      onClose();
+      await saveExpense(formData);
     } catch (error) {
-      setErrors(Object.fromEntries(Object.entries(error.errors || { form: [error.message] }).map(([key, messages]) => [key, messages[0]])));
+      // same category, date and amount already saved: ask, then send the same form again with confirm_duplicate
+      if (error.errors?.duplicate && window.confirm(error.errors.duplicate[0])) {
+        formData.set("confirm_duplicate", "1");
+        try {
+          await saveExpense(formData);
+        } catch (retryError) {
+          showErrors(retryError);
+        }
+        return;
+      }
+      if (error.errors?.duplicate) return;
+      showErrors(error);
     }
+  }
+
+  async function saveExpense(formData) {
+    await save({ id: expense?.id, formData }).unwrap();
+    notify("Expense saved.");
+    onClose();
+  }
+
+  function showErrors(error) {
+    setErrors(Object.fromEntries(Object.entries(error.errors || { form: [error.message] }).map(([key, messages]) => [key, messages[0]])));
   }
 
   async function handleDelete() {

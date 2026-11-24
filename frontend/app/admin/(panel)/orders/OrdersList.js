@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ClipboardPlus, Search, ShoppingBag } from "lucide-react";
 import { useOrdersQuery } from "@/store/admin/ordersApi";
 import { useUrlFilters } from "@/components/admin/useUrlFilters";
+import { ExportButton } from "@/components/admin/AdminShell";
 import { ORDER_STATUSES, PAYMENT_STATUSES, SALES_CHANNELS } from "@/lib/admin-options";
 import { formatBDT, formatDateTime } from "@/lib/format";
 import { Badge, Button, Card, cx, EmptyState, ErrorBlock, LoadingBlock, PageHeader, Pagination, Select, StatusBadge, Table } from "@/components/admin/ui";
@@ -34,11 +35,14 @@ export default function OrdersList() {
         title="Orders"
         description="Website orders and manual sales in one place."
         actions={
-          <Link href="/admin/sales/new">
-            <Button variant="gold">
-              <ClipboardPlus className="size-4" /> New sale
-            </Button>
-          </Link>
+          <>
+            <ExportButton type="orders" params={{ status: filters.status, from: filters.from, to: filters.to }} />
+            <Link href="/admin/sales/new">
+              <Button variant="gold">
+                <ClipboardPlus className="size-4" /> New sale
+              </Button>
+            </Link>
+          </>
         }
       />
 

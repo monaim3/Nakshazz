@@ -7,7 +7,8 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertCircle, Banknote, Check, ChevronLeft, Copy, Loader2, Lock, ShoppingBag, Tag, X } from "lucide-react";
-import { readCart, useCart, writeCart } from "@/lib/cart-storage";
+import { readCart, syncCartWithQuote, useCart, writeCart } from "@/lib/cart-storage";
+import { priceChangedText } from "./CartDrawer";
 import { localePath, localizeDigits } from "@/lib/i18n";
 import { formatPrice } from "./Price";
 
@@ -38,6 +39,12 @@ function buildSchema(t, methods) {
       if (!BD_PHONE.test(digits(value.sender))) ctx.addIssue({ code: "custom", path: ["sender"], message: t.errors.phone });
       if (!/^[A-Za-z0-9]{8,20}$/.test(value.trx.trim())) ctx.addIssue({ code: "custom", path: ["trx"], message: t.errors.trx });
     });
+}
+
+/** One key per checkout attempt: a retry or double tap of the same submit can't make two orders. */
+function newIdempotencyKey() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 }
 
 function readSaved() {
@@ -75,6 +82,9 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [priceNotes, setPriceNotes] = useState({});
+  const [attemptKey, setAttemptKey] = useState(null);
 
   const [zone, phone, method] = useWatch({ control, name: ["zone", "phone", "method"] });
 
@@ -104,7 +114,12 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
         }),
       })
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
-        .then(({ data }) => setQuote(data))
+        .then(({ data }) => {
+          setQuote(data);
+          // prices only: stock problems stay visible here so the shopper decides
+          const changes = syncCartWithQuote(data.lines, { stock: false });
+          if (changes.length) setPriceNotes((notes) => ({ ...notes, ...Object.fromEntries(changes.map((change) => [change.variantId, change])) }));
+        })
         .catch((reason) => reason.name !== "AbortError" && setFormError(t.quoteError))
         .finally(() => setQuoting(false));
     }, 300);
@@ -136,10 +151,13 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
       return;
     }
     setSubmitting(true);
+    // same key for every retry of this attempt; replaced once an order is placed
+    const idempotencyKey = attemptKey ?? newIdempotencyKey();
+    setAttemptKey(idempotencyKey);
     try {
       const response = await fetch(`${API}/checkout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", "Idempotency-Key": idempotencyKey },
         body: JSON.stringify({
           customer: { name: values.name, phone: values.phone, email: values.email || undefined },
           shipping: { address: values.address, area: values.area || undefined, city: values.city, delivery_zone_id: values.zone },
@@ -153,8 +171,13 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
       const body = await response.json().catch(() => ({}));
 
       if (response.status === 201) {
+        setAttemptKey(null);
         try {
-          window.localStorage.setItem(SAVED_KEY, JSON.stringify({ name: values.name, phone: values.phone, email: values.email, address: values.address, area: values.area, city: values.city, zone: values.zone }));
+          if (remember) {
+            window.localStorage.setItem(SAVED_KEY, JSON.stringify({ name: values.name, phone: values.phone, email: values.email, address: values.address, area: values.area, city: values.city, zone: values.zone }));
+          } else {
+            window.localStorage.removeItem(SAVED_KEY);
+          }
         } catch {
           // ignore
         }
@@ -267,6 +290,13 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
               <textarea id="co-note" rows={2} maxLength={500} className={`${field} h-auto py-3`} {...register("note")} />
             </div>
           </div>
+          <label className="mt-4 flex cursor-pointer items-start gap-3 text-sm text-ink/75">
+            <input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} className="mt-0.5 size-4 shrink-0 accent-navy-900" />
+            <span>
+              <span className="block font-medium text-navy-900">{t.rememberDetails || (lang === "bn" ? "এই ডিভাইসে আমার তথ্য মনে রাখুন" : "Remember my details on this device")}</span>
+              <span className="block text-xs text-ink/55">{t.rememberDetailsHint || (lang === "bn" ? "নাম, ফোন ও ঠিকানা পরের অর্ডারে আগে থেকে পূরণ হবে। শেয়ার করা ফোনে টিক তুলে দিন।" : "Name, phone and address are filled in next time. Untick on a shared phone.")}</span>
+            </span>
+          </label>
         </fieldset>
 
         {/* 3. Payment */}
@@ -369,6 +399,11 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="truncate font-medium text-navy-900">{line.product_name || "—"}</p>
                   {line.variant_title && <p className="text-xs text-ink/55">{line.variant_title}</p>}
+                  {priceNotes[line.variant_id] && (
+                    <p className="mt-1 flex items-center gap-1 text-xs text-marigold-700" role="status">
+                      <AlertCircle className="size-3.5 shrink-0" /> {priceChangedText(t, lang, priceNotes[line.variant_id].from, priceNotes[line.variant_id].to)}
+                    </p>
+                  )}
                   {line.problem && (
                     <p className="mt-1 flex items-center gap-1 text-xs text-lotus-600">
                       <AlertCircle className="size-3.5" /> {t.problems[line.problem]}

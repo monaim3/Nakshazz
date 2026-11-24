@@ -196,6 +196,7 @@ class OperationsService
                     'sku' => $variant->sku,
                     'title' => $variant->title,
                     'product' => $variant->product?->name,
+                    'product_id' => $variant->product_id,
                     'product_slug' => $variant->product?->slug,
                     'available' => $available,
                     'low_stock_threshold' => $limit,

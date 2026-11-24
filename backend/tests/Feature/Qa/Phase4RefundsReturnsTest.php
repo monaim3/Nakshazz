@@ -271,11 +271,18 @@ class Phase4RefundsReturnsTest extends TestCase
     }
 
     #[Test]
-    public function x15_risk_the_same_refund_submitted_twice_is_recorded_twice_while_balance_allows(): void
+    public function x15_fixed_the_same_refund_twice_is_caught(): void
     {
         $order = $this->delivered([[$this->variant(stock: 5), 1]]);
-        $this->by($this->owner)->postJson("/api/v1/admin/orders/{$order->id}/refunds", ['amount' => '300', 'method' => 'bkash'])->assertCreated();
-        $this->by($this->owner)->postJson("/api/v1/admin/orders/{$order->id}/refunds", ['amount' => '300', 'method' => 'bkash'])->assertCreated();
+        $url = "/api/v1/admin/orders/{$order->id}/refunds";
+        $this->by($this->owner)->postJson($url, ['amount' => '300', 'method' => 'bkash'], ['Idempotency-Key' => 'r-1'])->assertCreated();
+
+        // FIXED (RISK-1): a retry of the same attempt is answered from the first result
+        $this->by($this->owner)->postJson($url, ['amount' => '300', 'method' => 'bkash'], ['Idempotency-Key' => 'r-1'])->assertCreated()->assertHeader('Idempotent-Replayed', 'true');
+        $this->assertSame('300.00', $this->refunded($order));
+        // FIXED (my call 13): a second identical refund the same day asks first
+        $this->by($this->owner)->postJson($url, ['amount' => '300', 'method' => 'bkash'])->assertJsonValidationErrors('duplicate');
+        $this->by($this->owner)->postJson($url, ['amount' => '300', 'method' => 'bkash', 'confirm_duplicate' => true])->assertCreated();
 
         $this->assertSame('600.00', $this->refunded($order));
     }

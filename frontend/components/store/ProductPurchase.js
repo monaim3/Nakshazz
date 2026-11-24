@@ -35,7 +35,7 @@ export default function ProductPurchase({ product, lang, t, tryOnT }) {
 
   function add(thenCheckout = false) {
     if (soldOut) return;
-    addToCart(variant.id, quantity, max);
+    addToCart(variant.id, quantity, max, variant.price);
     if (thenCheckout) {
       router.push(localePath(lang, "/checkout"));
       return;

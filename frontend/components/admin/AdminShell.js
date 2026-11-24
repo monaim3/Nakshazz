@@ -6,10 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   BadgeDollarSign, Boxes, ChartColumn, FolderTree, Gem, Image as ImageIcon, LayoutDashboard, LogOut,
   Mail, Menu, Receipt, Settings, ShoppingBag, Star, Tag, Users, UserCog, Wallet, X, ClipboardPlus,
+  CalendarCheck, PackagePlus, History, Download,
 } from "lucide-react";
 import { adminApi, useAlertsQuery, useLogoutMutation, useMeQuery } from "@/store/admin/api";
 import { useDispatch } from "react-redux";
-import { cx, LoadingBlock, useToast } from "./ui";
+import { adminDownload, toQuery } from "@/lib/admin-api-client";
+import { Button, cx, LoadingBlock, useToast } from "./ui";
 
 const NAV = [
   { section: "Sell" },
@@ -29,6 +31,9 @@ const NAV = [
   { section: "Business", ownerOnly: true },
   { href: "/admin/reports", label: "Sales & profit", icon: ChartColumn, ownerOnly: true },
   { href: "/admin/expenses", label: "Expenses", icon: Receipt, ownerOnly: true },
+  { href: "/admin/closing", label: "Daily closing", icon: CalendarCheck, ownerOnly: true },
+  { href: "/admin/restock", label: "Restock", icon: PackagePlus, ownerOnly: true },
+  { href: "/admin/activity", label: "Activity log", icon: History, ownerOnly: true },
   { href: "/admin/coupons", label: "Coupons", icon: Tag, ownerOnly: true },
   { href: "/admin/staff", label: "Staff", icon: UserCog, ownerOnly: true },
   { href: "/admin/settings", label: "Settings", icon: Settings, ownerOnly: true },
@@ -229,4 +234,33 @@ function chime() {
 export function useIsOwner() {
   const { data } = useMeQuery();
   return Boolean(data?.data?.permissions?.view_financials);
+}
+
+/**
+ * Owner-only "Export CSV" button: downloads /admin/exports/{type} with the login cookie.
+ * Empty params are left out. Renders nothing for staff.
+ */
+export function ExportButton({ type, params, label = "Export CSV", size = "md", variant = "secondary" }) {
+  const isOwner = useIsOwner();
+  const { notify } = useToast();
+  const [busy, setBusy] = useState(false);
+
+  if (!isOwner) return null;
+
+  async function download() {
+    setBusy(true);
+    try {
+      await adminDownload(`/admin/exports/${type}${toQuery(params)}`, `nakshazz-${type}.csv`);
+    } catch (error) {
+      notify(error.message || "Download failed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Button variant={variant} size={size} loading={busy} onClick={download}>
+      {!busy && <Download className="size-4" aria-hidden />} {label}
+    </Button>
+  );
 }

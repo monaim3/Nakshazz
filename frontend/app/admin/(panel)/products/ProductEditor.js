@@ -28,7 +28,7 @@ export default function ProductEditor({ editing = false }) {
         <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{product ? product.name : "Add product"}</h1>
         {product && <StatusBadge status={product.status} />}
         {product?.status === "active" && (
-          <a href={`/products/${product.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-gold-700 hover:underline">
+          <a href={`/product/${product.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-gold-700 hover:underline">
             View in shop <ExternalLink className="size-3.5" />
           </a>
         )}

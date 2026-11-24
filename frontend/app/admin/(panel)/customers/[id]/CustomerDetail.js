@@ -22,7 +22,10 @@ export default function CustomerDetail() {
   if (error) return <ErrorBlock error={error} onRetry={refetch} />;
 
   const customer = data.data;
-  const average = customer.orders_count ? Number(customer.total_purchases) / customer.orders_count : 0;
+  // total_purchases only counts shipped + delivered orders, so divide by those (not by every order,
+  // which includes pending and cancelled ones). Older API answers without the count: fall back.
+  const purchases = customer.purchases_count ?? customer.orders_count;
+  const average = purchases ? Number(customer.total_purchases) / purchases : 0;
 
   return (
     <>
@@ -50,9 +53,9 @@ export default function CustomerDetail() {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <StatCard label="Orders" value={customer.orders_count} />
+        <StatCard label="Orders" value={customer.orders_count} hint={customer.purchases_count != null ? `${customer.purchases_count} shipped or delivered` : undefined} />
         <StatCard label="Total bought" value={formatBDT(customer.total_purchases)} hint="Shipped & delivered" />
-        <StatCard label="Average order" value={formatBDT(average)} />
+        <StatCard label="Average order" value={formatBDT(average)} hint={customer.purchases_count != null ? `Over ${customer.purchases_count} ${customer.purchases_count === 1 ? "purchase" : "purchases"}` : undefined} />
         <StatCard label="Phone" value={<span className="text-base">{customer.phone}</span>} hint={customer.email || "No email"} />
       </div>
 

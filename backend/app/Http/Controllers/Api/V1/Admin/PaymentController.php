@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRecordStatus;
+use App\Enums\PaymentType;
 use App\Enums\RefundReason;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Admin\PaymentResource;
@@ -104,7 +105,19 @@ class PaymentController extends Controller
             'reason' => ['nullable', Rule::in([RefundReason::Compensation->value, RefundReason::Cancellation->value])],
             'transaction_id' => ['nullable', 'string', 'max:60'],
             'note' => ['nullable', 'string', 'max:255'],
+            'confirm_duplicate' => ['sometimes', 'boolean'],
         ]);
+
+        // the same refund twice in a day is usually a mistake: ask first
+        $sameRefund = $order->payments()
+            ->where('type', PaymentType::Refund)
+            ->where('status', PaymentRecordStatus::Verified)
+            ->where('amount', Money::of((string) $data['amount']))
+            ->where('created_at', '>=', now()->subDay())
+            ->exists();
+        if ($sameRefund && ! $request->boolean('confirm_duplicate')) {
+            throw ValidationException::withMessages(['duplicate' => ['A refund of this amount was already recorded for this order today. Record another one?']]);
+        }
 
         $refund = DB::transaction(fn () => $this->payments->refund(
             Order::query()->lockForUpdate()->findOrFail($order->id),

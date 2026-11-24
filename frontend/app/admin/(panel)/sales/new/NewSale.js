@@ -1,15 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { CheckCircle2, Minus, PackageSearch, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { useCreateManualSaleMutation, useProductSearchQuery } from "@/store/admin/ordersApi";
 import { addLine, removeLine, resetSale, setChannel, setSaleStatus, updateLine } from "@/store/admin/posSlice";
 import { usePublicSettings } from "@/components/admin/usePublicSettings";
 import { PAYMENT_METHODS, SALES_CHANNELS } from "@/lib/admin-options";
+import { newIdempotencyKey } from "@/lib/admin-api-client";
 import { formatBDT } from "@/lib/format";
 import { Button, Card, cx, EmptyState, Input, PageHeader, Select, Spinner, Textarea, useToast } from "@/components/admin/ui";
+
+// Website orders come from the shop's own checkout; the server refuses them here.
+const MANUAL_CHANNELS = SALES_CHANNELS.filter((option) => option.value !== "website");
+
+// Server field names shown next to a field on this screen (anything else goes to the summary).
+const SHOWN_FIELDS = ["channel", "customer.name", "customer.phone", "shipping.address", "shipping.city", "shipping.delivery_zone_id", "delivery_charge", "manual_discount", "payment.amount", "payment.method", "payment.transaction_id", "items"];
 
 export default function NewSale() {
   const [completed, setCompleted] = useState(null);
@@ -128,7 +135,10 @@ function Basket({ onComplete }) {
   const { notify } = useToast();
   const [form, setForm] = useState({ name: "", phone: "", address: "", area: "", city: "", zone: "", delivery: "", discount: "", method: "cash", amount: "", transaction_id: "", note: "" });
   const [errors, setErrors] = useState({});
+  // one key per sale attempt: a retry after a dropped connection can't record the sale twice
+  const attemptKey = useRef(null);
   const needsCourier = status === "confirmed";
+  const saleChannel = MANUAL_CHANNELS.some((option) => option.value === channel) ? channel : MANUAL_CHANNELS[0].value;
 
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.value }));
 
@@ -146,7 +156,7 @@ function Basket({ onComplete }) {
     }
 
     const payload = {
-      channel,
+      channel: saleChannel,
       status,
       customer: form.name || form.phone ? { name: form.name || null, phone: form.phone || null } : null,
       shipping: needsCourier ? { address: form.address, area: form.area || null, city: form.city, delivery_zone_id: form.zone ? Number(form.zone) : null } : null,
@@ -162,8 +172,10 @@ function Basket({ onComplete }) {
       note: form.note || null,
     };
 
+    attemptKey.current ??= newIdempotencyKey();
     try {
-      const result = await createSale(payload).unwrap();
+      const result = await createSale({ idempotencyKey: attemptKey.current, ...payload }).unwrap();
+      attemptKey.current = null;
       dispatch(resetSale());
       notify(`Sale ${result.data.order_number} saved.`);
       onComplete(result.data);
@@ -172,7 +184,11 @@ function Basket({ onComplete }) {
       Object.entries(error.errors || {}).forEach(([key, messages]) => {
         fieldErrors[key] = messages[0];
       });
-      setErrors(Object.keys(fieldErrors).length ? fieldErrors : { form: error.message });
+      // anything not shown beside a field (or a line) also appears above the button
+      const unshown = Object.keys(fieldErrors).filter((key) => !SHOWN_FIELDS.includes(key) && !/^items\.\d+\./.test(key));
+      if (!Object.keys(fieldErrors).length) fieldErrors.form = error.message;
+      else if (unshown.length) fieldErrors.form = fieldErrors[unshown[0]];
+      setErrors(fieldErrors);
     }
   }
 
@@ -185,7 +201,8 @@ function Basket({ onComplete }) {
           <ul className="divide-y divide-ink-100">
             {lines.map((line, index) => {
               const overStock = !line.allowBackorder && line.quantity > line.available;
-              const stockError = errors[`items.${index}.quantity`];
+              const stockError = errors[`items.${index}.quantity`] || errors[`items.${index}.variant_id`];
+              const priceError = errors[`items.${index}.unit_price`];
               return (
                 <li key={line.variantId} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
@@ -216,12 +233,17 @@ function Basket({ onComplete }) {
                         inputMode="decimal"
                         value={line.unitPrice}
                         onChange={(event) => dispatch(updateLine({ variantId: line.variantId, unitPrice: event.target.value }))}
-                        className="h-8 w-24 rounded-md border-0 px-2 text-right text-sm tabular-nums ring-1 ring-ink-200 ring-inset focus:ring-2 focus:ring-gold-500 focus:outline-none"
+                        aria-invalid={priceError ? true : undefined}
+                        className={cx(
+                          "h-8 w-24 rounded-md border-0 px-2 text-right text-sm tabular-nums ring-1 ring-inset focus:ring-2 focus:ring-gold-500 focus:outline-none",
+                          priceError ? "ring-red-400" : "ring-ink-200",
+                        )}
                         aria-label={`Unit price for ${line.productName}`}
                       />
                     </label>
                   </div>
                   {(overStock || stockError) && <p className="mt-1 text-xs text-red-600">{stockError || `Only ${line.available} in stock.`}</p>}
+                  {priceError && <p className="mt-1 text-xs text-red-600">{priceError}</p>}
                 </li>
               );
             })}
@@ -233,7 +255,7 @@ function Basket({ onComplete }) {
       <Card title="Sale details">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <Select label="Channel" options={SALES_CHANNELS.filter((option) => option.value !== "website")} value={channel} onChange={(event) => dispatch(setChannel(event.target.value))} />
+            <Select label="Channel" options={MANUAL_CHANNELS} value={saleChannel} error={errors.channel} onChange={(event) => dispatch(setChannel(event.target.value))} />
             <Select
               label="Handover"
               options={[
@@ -255,14 +277,14 @@ function Basket({ onComplete }) {
               <Input className="col-span-2" label="Address" required value={form.address} onChange={set("address")} error={errors["shipping.address"]} />
               <Input label="Area" value={form.area} onChange={set("area")} />
               <Input label="City" required value={form.city} onChange={set("city")} error={errors["shipping.city"]} />
-              <Select label="Delivery zone" placeholder="Choose" options={zones.map((zone) => ({ value: String(zone.id), label: `${zone.name} (${formatBDT(zone.charge)})` }))} value={form.zone} onChange={set("zone")} />
-              <Input label="Delivery charge" type="number" min="0" inputMode="decimal" placeholder={zoneCharge ?? "0"} value={form.delivery} onChange={set("delivery")} />
+              <Select label="Delivery zone" placeholder="Choose" options={zones.map((zone) => ({ value: String(zone.id), label: `${zone.name} (${formatBDT(zone.charge)})` }))} value={form.zone} onChange={set("zone")} error={errors["shipping.delivery_zone_id"]} />
+              <Input label="Delivery charge" type="number" min="0" inputMode="decimal" placeholder={zoneCharge ?? "0"} value={form.delivery} onChange={set("delivery")} error={errors.delivery_charge} />
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             <Input label="Discount (৳)" type="number" min="0" inputMode="decimal" value={form.discount} onChange={set("discount")} error={errors.manual_discount} />
-            <Select label="Payment" options={PAYMENT_METHODS} value={form.method} onChange={set("method")} />
+            <Select label="Payment" options={PAYMENT_METHODS} value={form.method} onChange={set("method")} error={errors["payment.method"]} />
             <Input
               label="Amount received"
               type="number"

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { AlertTriangle, ArrowRight, Banknote, ClipboardPlus, PackageCheck, ShoppingBag, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, Banknote, Boxes, ClipboardPlus, Hourglass, PackageCheck, PackagePlus, PackageX, ShoppingBag, TrendingUp, Wallet } from "lucide-react";
 import { useDashboardQuery } from "@/store/admin/api";
 import { formatBDT, formatDateTime, todayISO } from "@/lib/format";
 import { Badge, Button, Card, cx, EmptyState, ErrorBlock, LoadingBlock, PageHeader, StatCard, StatusBadge, Table } from "@/components/admin/ui";
 import SalesChart from "@/components/admin/SalesChart";
+import { useIsOwner } from "@/components/admin/AdminShell";
 
 const RANGES = [
   { key: "7", label: "7 days", days: 7 },
@@ -24,7 +25,7 @@ export default function Dashboard() {
     <>
       <PageHeader
         title="Dashboard"
-        description="Completed sales and profit for the selected period. Pending orders are counted separately as estimates."
+        description="Sales and profit count delivered orders only, with returns taken off (same as the Sales & profit page). Open orders are shown separately as estimates."
         actions={
           <>
             <div className="inline-flex rounded-lg bg-white p-1 ring-1 ring-ink-200" role="group" aria-label="Date range">
@@ -57,16 +58,26 @@ export default function Dashboard() {
           <Attention attention={dashboard.attention} />
 
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            <StatCard label="Revenue" value={formatBDT(dashboard.cards.total_revenue)} hint="Completed, after discounts" icon={Banknote} />
-            <StatCard label="Orders" value={dashboard.cards.total_orders} hint={`${dashboard.cards.completed_orders} completed`} icon={ShoppingBag} />
-            <StatCard label="Website sales" value={formatBDT(dashboard.cards.website_sales)} icon={TrendingUp} />
-            <StatCard label="Manual sales" value={formatBDT(dashboard.cards.manual_sales)} hint="Facebook, WhatsApp, store…" icon={ClipboardPlus} />
+            <StatCard label="Revenue (delivered)" value={formatBDT(dashboard.cards.total_revenue)} hint="Delivered orders, after discounts and returns" icon={Banknote} />
+            <StatCard label="Orders" value={dashboard.cards.total_orders} hint={`${dashboard.cards.completed_orders} delivered · rest still open`} icon={ShoppingBag} />
+            <StatCard label="Website sales (delivered, after returns)" value={formatBDT(dashboard.cards.website_sales)} icon={TrendingUp} />
+            <StatCard label="Manual sales (delivered, after returns)" value={formatBDT(dashboard.cards.manual_sales)} hint="Facebook, WhatsApp, store…" icon={ClipboardPlus} />
             {"net_profit" in dashboard.cards && (
               <>
-                <StatCard label="Gross profit" value={formatBDT(dashboard.cards.gross_profit)} tone="gold" hint="Revenue − product cost" />
-                <StatCard label="Net profit" value={formatBDT(dashboard.cards.net_profit)} tone={Number(dashboard.cards.net_profit) < 0 ? "bad" : "good"} hint="After delivery, fees & expenses" />
-                <StatCard label="Estimated profit" value={formatBDT(dashboard.cards.estimated_gross_profit)} hint="Open orders, not yet earned" />
+                <StatCard label="Gross profit (delivered)" value={formatBDT(dashboard.cards.gross_profit)} tone="gold" hint="Delivered revenue − product cost" />
+                <StatCard label="Net profit (delivered)" value={formatBDT(dashboard.cards.net_profit)} tone={Number(dashboard.cards.net_profit) < 0 ? "bad" : "good"} hint="After delivery costs, fees & expenses" />
+                <StatCard label="Estimated profit" value={formatBDT(dashboard.cards.estimated_gross_profit)} hint="Open orders, not yet delivered" />
               </>
+            )}
+            {dashboard.receivables && (
+              <Link href="/admin/closing" className="rounded-[var(--radius-card)] transition-shadow hover:shadow-sm">
+                <StatCard label="Money still owed" value={formatBDT(dashboard.receivables.total)} hint={`${dashboard.receivables.count} unpaid order${dashboard.receivables.count === 1 ? "" : "s"} · see Daily closing`} icon={Hourglass} />
+              </Link>
+            )}
+            {dashboard.stock_value && (
+              <Link href="/admin/restock" className="rounded-[var(--radius-card)] transition-shadow hover:shadow-sm">
+                <StatCard label="Stock value (at cost)" value={formatBDT(dashboard.stock_value.at_cost)} hint={`${formatBDT(dashboard.stock_value.at_price)} at price · ${dashboard.stock_value.units} units`} icon={Boxes} />
+              </Link>
             )}
           </div>
 
@@ -110,9 +121,14 @@ export default function Dashboard() {
 }
 
 function Attention({ attention }) {
+  const isOwner = useIsOwner();
+  const restockHref = isOwner ? "/admin/restock" : "/admin/inventory?low_stock=1";
   const items = [
     { count: attention.unconfirmed_over_24h, label: "orders waiting over 24h to be confirmed", href: "/admin/orders?status=pending", tone: "red", icon: AlertTriangle },
+    { count: attention.bkash_waiting_over_week, label: "bKash payments waiting over 7 days", href: "/admin/payments", tone: "red", icon: Wallet },
     { count: attention.bkash_to_verify, label: "bKash payments to verify", href: "/admin/payments", tone: "amber", icon: Wallet },
+    { count: attention.restock_out, label: "selling products out of stock", href: restockHref, tone: "red", icon: PackageX },
+    { count: (attention.restock_needed || 0) - (attention.restock_out || 0), label: "products to restock soon", href: restockHref, tone: "blue", icon: PackagePlus },
     { count: attention.pending_orders, label: "new orders to confirm", href: "/admin/orders?status=pending", tone: "amber", icon: ShoppingBag },
     { count: attention.ready_to_ship, label: "orders ready to ship", href: "/admin/orders?status=confirmed", tone: "blue", icon: PackageCheck },
   ].filter((item) => item.count > 0);

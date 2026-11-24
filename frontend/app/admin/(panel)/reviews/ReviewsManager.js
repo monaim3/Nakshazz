@@ -99,6 +99,7 @@ export default function ReviewsManager() {
                       <span className="text-sm font-medium text-ink-900">{review.customer_name}</span>
                       {review.order_id && <Badge tone="green">Verified buyer</Badge>}
                       {review.is_featured && <Badge tone="gold">On homepage</Badge>}
+                      {Boolean(review.possible_duplicate) && <Badge tone="red">Possible duplicate</Badge>}
                       <StatusBadge status={review.status} />
                     </div>
                     <p className="text-sm whitespace-pre-line text-ink-700">{review.comment}</p>
@@ -147,13 +148,17 @@ function ImportModal({ onClose }) {
   const [errors, setErrors] = useState({});
   const set = (key) => (event) => setForm((current) => ({ ...current, [key]: event.target.type === "checkbox" ? event.target.checked : event.target.value }));
 
-  async function submit() {
+  async function submit(confirmDuplicate = false) {
     setErrors({});
     try {
-      await importReview({ ...form, product_id: form.product_id ? Number(form.product_id) : null, rating: Number(form.rating) }).unwrap();
+      await importReview({ ...form, product_id: form.product_id ? Number(form.product_id) : null, rating: Number(form.rating), ...(confirmDuplicate ? { confirm_duplicate: true } : {}) }).unwrap();
       notify("Review added.");
       onClose();
     } catch (error) {
+      // same text already saved: ask before adding it a second time
+      if (!confirmDuplicate && error.errors?.duplicate && window.confirm(error.errors.duplicate[0])) {
+        return submit(true);
+      }
       setErrors(Object.fromEntries(Object.entries(error.errors || { form: [error.message] }).map(([key, messages]) => [key, messages[0]])));
     }
   }
@@ -168,7 +173,7 @@ function ImportModal({ onClose }) {
           <Button variant="secondary" onClick={onClose}>
             Cancel
           </Button>
-          <Button loading={isLoading} onClick={submit}>
+          <Button loading={isLoading} onClick={() => submit()}>
             Add review
           </Button>
         </>

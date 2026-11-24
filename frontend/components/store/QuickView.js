@@ -73,7 +73,7 @@ export default function QuickView({ slug, open, onClose, lang, t }) {
 
   function handleAdd() {
     if (!variant || soldOut) return;
-    addToCart(variant.id, quantity, max);
+    addToCart(variant.id, quantity, max, variant.price);
     // show the bag right away (popular pattern); the quick view closes behind it
     setTimeout(() => {
       onClose();

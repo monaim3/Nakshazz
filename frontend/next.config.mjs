@@ -35,6 +35,10 @@ const nextConfig = {
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
       { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      // Safe CSP baseline: no plug-ins, no <base> hijack, forms only post to us, only our own
+      // pages may frame us, http asset links are upgraded. (Script sources are not restricted:
+      // that needs per-request nonces, which conflict with the prerendered shop pages.)
+      { key: "Content-Security-Policy", value: "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests" },
     ];
     return [
       { source: "/:path*", headers: security },

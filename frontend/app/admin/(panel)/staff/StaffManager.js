@@ -72,6 +72,8 @@ function UserModal({ user, isSelf, onClose }) {
       email: form.get("email"),
       role: form.get("role"),
       ...(form.get("password") ? { password: form.get("password") } : {}),
+      // changing your own password or email needs your current password (checked by the server)
+      ...(isSelf && form.get("current_password") ? { current_password: form.get("current_password") } : {}),
       ...(user ? { is_active: event.currentTarget.elements.is_active.checked } : {}),
     };
 
@@ -122,6 +124,15 @@ function UserModal({ user, isSelf, onClose }) {
           hint="At least 10 characters with letters and numbers."
           error={errors.password}
         />
+        {isSelf && (
+          <PasswordInput
+            name="current_password"
+            label="Current password"
+            autoComplete="current-password"
+            hint="Needed to change your own password or email."
+            error={errors.current_password}
+          />
+        )}
         {user && !isSelf && <Checkbox name="is_active" label="Account active" hint="Disabled accounts are signed out immediately." defaultChecked={user.is_active} />}
         {user && isSelf && <input type="checkbox" name="is_active" defaultChecked hidden readOnly />}
         {errors.form && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{errors.form}</p>}

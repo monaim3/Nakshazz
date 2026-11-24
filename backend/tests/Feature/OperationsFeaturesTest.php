@@ -204,6 +204,7 @@ class OperationsFeaturesTest extends TestCase
         $response->assertHeader('X-Frame-Options', 'DENY');
         $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->assertHeaderMissing('X-Powered-By');
+        $this->assertStringContainsString("frame-ancestors 'none'", (string) $response->headers->get('Content-Security-Policy'));
     }
 
     #[Test]

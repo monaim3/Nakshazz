@@ -23,6 +23,11 @@ class SecurityHeaders
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        // the API only answers JSON / files: nothing it returns may run scripts or be framed
+        // (JSON only: a strict policy on a PDF receipt would stop the browser's PDF viewer)
+        if (! $response->headers->has('Content-Security-Policy') && str_contains((string) $response->headers->get('Content-Type'), 'json')) {
+            $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+        }
         if ($request->isSecure()) {
             $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
         }

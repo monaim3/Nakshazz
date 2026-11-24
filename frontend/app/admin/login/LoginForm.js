@@ -29,7 +29,7 @@ export default function LoginForm() {
     handleSubmit,
     setError,
     formState: { errors },
-  } = useForm({ resolver: zodResolver(schema), defaultValues: { remember: true } });
+  } = useForm({ resolver: zodResolver(schema), defaultValues: { remember: false } });
 
   async function onSubmit(values) {
     try {

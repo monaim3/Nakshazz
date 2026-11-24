@@ -1,4 +1,5 @@
 import HighlightTitle from "@/components/store/HighlightTitle";
+import RecentOrders from "@/components/store/RecentOrders";
 import TrackOrderForm from "@/components/store/TrackOrderForm";
 import { currentLang, getDictionary } from "@/lib/dictionaries";
 import { localePath } from "@/lib/i18n";
@@ -16,6 +17,7 @@ export default async function TrackOrderPage() {
         <HighlightTitle text={dict.order.trackTitle} />
       </h1>
       <p className="mx-auto mt-3 mb-8 max-w-md text-center text-sm text-ink/65">{dict.order.trackIntro}</p>
+      <RecentOrders lang={lang} />
       <TrackOrderForm lang={lang} t={dict.order} />
     </div>
   );

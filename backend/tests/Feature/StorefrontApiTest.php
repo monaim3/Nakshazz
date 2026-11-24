@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Notifications\NewWebsiteOrder;
+use App\Notifications\OrderPlacedCustomer;
 use Database\Seeders\StoreSettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
@@ -150,6 +151,30 @@ class StorefrontApiTest extends TestCase
                 && str_ends_with($mail->actionUrl, "/admin/orders/{$notification->order->id}");
         });
         Notification::assertNotSentTo([$staff, $former], NewWebsiteOrder::class);
+    }
+
+    #[Test]
+    public function the_customer_gets_a_confirmation_email_only_when_they_gave_one(): void
+    {
+        Notification::fake();
+        $this->withoutDefer();
+        $variant = $this->product()->variants->first();
+
+        // no email typed: nothing goes to the customer
+        $this->postJson('/api/v1/checkout', $this->checkoutPayload($variant))->assertCreated();
+        Notification::assertSentOnDemandTimes(OrderPlacedCustomer::class, 0);
+
+        $payload = $this->checkoutPayload($variant);
+        $payload['customer']['email'] = 'rina@example.com';
+        $order = $this->postJson('/api/v1/checkout', $payload)->assertCreated()->json('data');
+
+        Notification::assertSentOnDemand(OrderPlacedCustomer::class, function (OrderPlacedCustomer $notification, array $channels, object $notifiable) use ($order) {
+            $mail = $notification->toMail($notifiable);
+
+            return $notifiable->routes['mail'] === 'rina@example.com'
+                && str_contains($mail->subject, $order['order_number'])
+                && str_ends_with($mail->actionUrl, '/order/'.$order['uuid']);
+        });
     }
 
     #[Test]

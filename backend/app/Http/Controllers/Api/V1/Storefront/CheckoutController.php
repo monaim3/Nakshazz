@@ -8,6 +8,7 @@ use App\Http\Requests\Storefront\CheckoutRequest;
 use App\Http\Resources\Storefront\CustomerOrderResource;
 use App\Models\User;
 use App\Notifications\NewWebsiteOrder;
+use App\Notifications\OrderPlacedCustomer;
 use App\Services\OrderService;
 use App\Services\StoreSettings;
 use Illuminate\Http\JsonResponse;
@@ -33,6 +34,15 @@ class CheckoutController extends Controller
                 $address
                     ? Notification::route('mail', $address)->notifyNow(new NewWebsiteOrder($order))
                     : Notification::sendNow(User::query()->where('is_active', true)->where('role', UserRole::Owner)->get(), new NewWebsiteOrder($order));
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+
+            // the customer's own confirmation (order number + private link), if they gave an email
+            try {
+                if (filled($order->customer_email)) {
+                    Notification::route('mail', $order->customer_email)->notifyNow(new OrderPlacedCustomer($order));
+                }
             } catch (Throwable $exception) {
                 report($exception);
             }

@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AlertCircle, Banknote, Check, ChevronLeft, Copy, Loader2, Lock, ShoppingBag, Tag, X } from "lucide-react";
 import { readCart, syncCartWithQuote, useCart, writeCart } from "@/lib/cart-storage";
+import { rememberOrder } from "@/lib/recent-orders-storage";
 import { priceChangedText } from "./CartDrawer";
 import { localePath, localizeDigits } from "@/lib/i18n";
 import { formatPrice } from "./Price";
@@ -175,6 +176,8 @@ export default function CheckoutForm({ lang, t, zones, methods, bkash }) {
         try {
           if (remember) {
             window.localStorage.setItem(SAVED_KEY, JSON.stringify({ name: values.name, phone: values.phone, email: values.email, address: values.address, area: values.area, city: values.city, zone: values.zone }));
+            // so Track order can list it next time, without the order number
+            rememberOrder(body.data);
           } else {
             window.localStorage.removeItem(SAVED_KEY);
           }

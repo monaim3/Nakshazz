@@ -30,6 +30,7 @@ class OrderReturnRequest extends FormRequest
             'refund.amount' => ['required_with:refund', 'numeric', 'min:0.01', 'decimal:0,2'],
             'refund.method' => ['required_with:refund', Rule::enum(PaymentMethod::class)],
             'refund.note' => ['nullable', 'string', 'max:255'],
+            'refund.transaction_id' => ['nullable', 'string', 'max:60'],
         ];
     }
 }

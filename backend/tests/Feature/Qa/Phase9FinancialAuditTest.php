@@ -116,8 +116,8 @@ class Phase9FinancialAuditTest extends TestCase
         $this->assertSame(11, $cards['total_orders'], '8 realized + 3 open');
         $this->assertSame('291.00', $cards['net_profit']);
         $this->assertSame('2600.00', $cards['manual_sales'], 'O3 1400 + O7 1200 (no returns among manual sales)');
-        // BUG-001 again: website card counts O6 in full (3000) although 2 of 3 came back → 9680 instead of 7680
-        $this->assertSame('9680.00', $cards['website_sales']);
+        // FIXED BUG-001: the website card uses the report formula, so O6's returned pieces come off
+        $this->assertSame('7680.00', $cards['website_sales']);
     }
 
     #[Test]
@@ -150,7 +150,9 @@ class Phase9FinancialAuditTest extends TestCase
         $save(['amount' => '100', 'expense_date' => '2026-11-21'])->assertJsonValidationErrors('expense_date');
         $id = $save(['amount' => '400', 'expense_date' => '2026-10-15'])->assertCreated()->json('data.id');
         $save(['amount' => '250', 'expense_date' => '2026-11-20'])->assertCreated();
-        $save(['amount' => '250', 'expense_date' => '2026-11-20'])->assertCreated(); // exact duplicate is accepted
+        // FIXED (my call 13): an exact duplicate asks first, and is saved only when confirmed
+        $save(['amount' => '250', 'expense_date' => '2026-11-20'])->assertJsonValidationErrors('duplicate');
+        $save(['amount' => '250', 'expense_date' => '2026-11-20', 'confirm_duplicate' => true])->assertCreated();
 
         $reports = app(ReportService::class);
         $month = fn (string $m) => $reports->summary(CarbonImmutable::parse("{$m}-01"), CarbonImmutable::parse("{$m}-01")->endOfMonth())['realized']['operating_expenses'];

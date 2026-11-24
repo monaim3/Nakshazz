@@ -32,6 +32,15 @@ class StoreSettingSeeder extends Seeder
             'bkash_instructions' => ['Send Money to the number above, then enter your bKash number and the Transaction ID (TrxID) below.', true],
             'low_stock_threshold' => [3, false],
             'order_notification_email' => [null, false],
+            // New sale: staff may not give more than this % off the list price, nor sell below cost
+            'staff_max_discount_percent' => [20, false],
+            // reorder suggestions cover this many days of sales
+            'reorder_cover_days' => [30, false],
+            // order messages to customers (the gateway itself is configured in .env)
+            'sms_enabled' => [false, false],
+            'sms_on_confirmed' => [true, false],
+            'sms_on_shipped' => [true, false],
+            'sms_on_delivered' => [false, false],
         ];
 
         foreach ($defaults as $key => [$value, $isPublic]) {

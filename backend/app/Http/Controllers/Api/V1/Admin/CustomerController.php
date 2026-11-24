@@ -25,7 +25,10 @@ class CustomerController extends Controller
                 $like = '%'.addcslashes(trim($term), '%_\\').'%';
                 $query->where(fn (Builder $q) => $q->where('name', 'like', $like)->orWhere('phone', 'like', $like)->orWhere('email', 'like', $like));
             })
-            ->withCount(['orders' => fn (Builder $q) => $q->where('status', '!=', OrderStatus::Cancelled)])
+            ->withCount([
+                'orders' => fn (Builder $q) => $q->where('status', '!=', OrderStatus::Cancelled),
+                'orders as purchases_count' => fn (Builder $q) => $q->whereIn('status', [OrderStatus::Delivered, OrderStatus::Shipped]),
+            ])
             ->withSum(['orders as total_purchases' => fn (Builder $q) => $q->whereIn('status', [OrderStatus::Delivered, OrderStatus::Shipped])], 'grand_total')
             ->withMax('orders as last_order_at', 'placed_at')
             ->orderByDesc('last_order_at')
@@ -38,7 +41,10 @@ class CustomerController extends Controller
     public function show(Customer $customer): JsonResponse
     {
         $customer->load(['addresses', 'orders' => fn ($q) => $q->latest('placed_at')->latest('id')->limit(50)]);
-        $customer->loadCount(['orders' => fn (Builder $q) => $q->where('status', '!=', OrderStatus::Cancelled)]);
+        $customer->loadCount([
+            'orders' => fn (Builder $q) => $q->where('status', '!=', OrderStatus::Cancelled),
+            'orders as purchases_count' => fn (Builder $q) => $q->whereIn('status', [OrderStatus::Delivered, OrderStatus::Shipped]),
+        ]);
         $customer->loadSum(['orders as total_purchases' => fn (Builder $q) => $q->whereIn('status', [OrderStatus::Delivered, OrderStatus::Shipped])], 'grand_total');
 
         return response()->json(['data' => [
@@ -71,6 +77,8 @@ class CustomerController extends Controller
             'email' => $customer->email,
             'notes' => $customer->notes,
             'orders_count' => $customer->orders_count ?? null,
+            // same orders as total_purchases (shipped + delivered): use these two for the average
+            'purchases_count' => $customer->purchases_count ?? null,
             'total_purchases' => number_format((float) ($customer->total_purchases ?? 0), 2, '.', ''),
             'last_order_at' => $customer->last_order_at ?? null,
             'created_at' => $customer->created_at?->toIso8601String(),

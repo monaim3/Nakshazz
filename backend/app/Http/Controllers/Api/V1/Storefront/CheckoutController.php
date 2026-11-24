@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1\Storefront;
 
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Storefront\CheckoutRequest;
 use App\Http\Resources\Storefront\CustomerOrderResource;
 use App\Models\User;
 use App\Notifications\NewWebsiteOrder;
 use App\Services\OrderService;
+use App\Services\StoreSettings;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Notification;
 use Throwable;
@@ -26,7 +28,11 @@ class CheckoutController extends Controller
         // mail server must never delay or fail a checkout (the host has no queue worker)
         defer(function () use ($order): void {
             try {
-                Notification::sendNow(User::query()->where('is_active', true)->get(), new NewWebsiteOrder($order));
+                // Settings → "Email new orders to"; when empty, the active owner account(s)
+                $address = app(StoreSettings::class)->get('order_notification_email');
+                $address
+                    ? Notification::route('mail', $address)->notifyNow(new NewWebsiteOrder($order))
+                    : Notification::sendNow(User::query()->where('is_active', true)->where('role', UserRole::Owner)->get(), new NewWebsiteOrder($order));
             } catch (Throwable $exception) {
                 report($exception);
             }

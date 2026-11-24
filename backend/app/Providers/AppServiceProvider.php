@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\ActivityLogger;
 use App\Services\StoreSettings;
 use App\Support\PhoneNumber;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -27,6 +28,7 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureRateLimiting();
         $this->configureGates();
+        ActivityLogger::register();
     }
 
     /**

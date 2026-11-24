@@ -110,16 +110,18 @@ class Phase5PaymentsTest extends TestCase
     }
 
     #[Test]
-    public function y5_customer_sent_less_than_the_total_verify_cannot_correct_the_amount(): void
+    public function y5_fixed_verify_records_the_amount_that_really_arrived(): void
     {
         $order = $this->bkashOrder();
         $payment = $order->payments()->firstOrFail();
 
-        // customer actually sent ৳1,000 but the record says ৳1,070; verify takes no amount
+        // FIXED (my call 4): customer actually sent ৳1,000 of ৳1,070; Verify takes "Amount received"
         $this->by($this->staff)->postJson("/api/v1/admin/payments/{$payment->id}/verify", ['amount' => '1000'])->assertOk();
-        $this->assertSame('1070.00', $payment->refresh()->amount);
+        $this->assertSame('1000.00', $payment->refresh()->amount);
+        $this->assertSame('partially_paid', $order->refresh()->payment_status->value);
 
-        // the safe path: reject, then record what really arrived
+        // the other path still works: reject, then record what really arrived
+
         $order2 = $this->bkashOrder();
         $p2 = $order2->payments()->firstOrFail();
         $this->by($this->staff)->postJson("/api/v1/admin/payments/{$p2->id}/reject", ['note' => 'Only ৳1,000 received'])->assertOk();
@@ -153,15 +155,15 @@ class Phase5PaymentsTest extends TestCase
     }
 
     #[Test]
-    public function y8_trxid_is_unique_per_method_whatever_the_spaces_or_case(): void
+    public function y8_fixed_trxid_is_unique_across_methods_whatever_the_spaces_or_case(): void
     {
         $a = $this->codOrder();
         $b = $this->codOrder();
         $this->by($this->staff)->postJson("/api/v1/admin/orders/{$a->id}/payments", ['method' => 'bkash', 'amount' => '100', 'transaction_id' => 'ABC 123 XYZ'])->assertCreated();
 
         $this->by($this->staff)->postJson("/api/v1/admin/orders/{$b->id}/payments", ['method' => 'bkash', 'amount' => '100', 'transaction_id' => 'abc123xyz'])->assertJsonValidationErrors('payment.transaction_id');
-        // the same bKash TrxID filed under "mobile banking" slips past the check
-        $this->by($this->staff)->postJson("/api/v1/admin/orders/{$b->id}/payments", ['method' => 'mobile_banking', 'amount' => '100', 'transaction_id' => 'ABC123XYZ'])->assertCreated();
+        // FIXED: filing the same TrxID under "mobile banking" no longer slips past the check
+        $this->by($this->staff)->postJson("/api/v1/admin/orders/{$b->id}/payments", ['method' => 'mobile_banking', 'amount' => '100', 'transaction_id' => 'ABC123XYZ'])->assertJsonValidationErrors('payment.transaction_id');
     }
 
     #[Test]

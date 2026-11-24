@@ -11,6 +11,7 @@ use App\Http\Resources\Admin\VariantResource;
 use App\Models\Order;
 use App\Models\Payment;
 use App\Models\ProductVariant;
+use App\Services\OperationsService;
 use App\Services\ReportService;
 use App\Services\StoreSettings;
 use App\Support\Money;
@@ -18,11 +19,12 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, ReportService $reports, StoreSettings $settings): JsonResponse
+    public function __invoke(Request $request, ReportService $reports, StoreSettings $settings, OperationsService $operations): JsonResponse
     {
         $validated = $request->validate([
             'from' => ['nullable', 'date'],
@@ -34,8 +36,14 @@ class DashboardController extends Controller
         $canSeeFinancials = $request->user()->can('view-financials');
 
         $summary = $reports->summary($from, $to);
-        $bySource = $this->revenueBySource($from, $to);
+        // same formula as the Reports page, so returns lower these cards too
+        $channels = collect($reports->byChannel($from, $to));
+        $bySource = [
+            OrderSource::Website->value => Money::of($channels->where('channel', 'website')->sum(fn ($c) => (float) $c['product_revenue'])),
+            OrderSource::Manual->value => Money::of($channels->where('channel', '!=', 'website')->sum(fn ($c) => (float) $c['product_revenue'])),
+        ];
         $lowStockThreshold = (int) $settings->get('low_stock_threshold', 3);
+        $restock = collect($operations->reorderSuggestions());
 
         return response()->json(['data' => [
             'range' => ['from' => $from->toDateString(), 'to' => $to->toDateString()],
@@ -55,8 +63,16 @@ class DashboardController extends Controller
                 'pending_orders' => Order::query()->where('status', OrderStatus::Pending)->count(),
                 'unconfirmed_over_24h' => Order::query()->where('status', OrderStatus::Pending)->where('placed_at', '<', now()->subDay())->count(),
                 'bkash_to_verify' => Payment::query()->where('status', PaymentRecordStatus::Pending)->count(),
+                'bkash_waiting_over_week' => Payment::query()->where('status', PaymentRecordStatus::Pending)->where('created_at', '<', now()->subDays(7))->count(),
                 'ready_to_ship' => Order::query()->whereIn('status', [OrderStatus::Confirmed, OrderStatus::Processing])->count(),
+                'restock_needed' => $restock->count(),
+                'restock_out' => $restock->where('urgency', 'out')->count(),
             ],
+            // owner: money tied up in stock and money still to come in from shipped orders
+            ...($canSeeFinancials ? [
+                'stock_value' => $operations->stockValue(),
+                'receivables' => Arr::except($operations->receivables(0), ['orders']),
+            ] : []),
             'low_stock' => VariantResource::collection(
                 ProductVariant::query()
                     ->with('product:id,name,slug,status')
@@ -72,21 +88,6 @@ class DashboardController extends Controller
             ),
             'sales_chart' => $this->dailySales($from, $to),
         ]]);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function revenueBySource(CarbonImmutable $from, CarbonImmutable $to): array
-    {
-        return DB::table('orders')
-            ->whereIn('status', [OrderStatus::Delivered->value, OrderStatus::Returned->value])
-            ->whereRaw('COALESCE(delivered_at, returned_at) BETWEEN ? AND ?', [$from->startOfDay(), $to->endOfDay()])
-            ->groupBy('source')
-            ->selectRaw('source, SUM(items_subtotal - coupon_discount - manual_discount) as revenue')
-            ->pluck('revenue', 'source')
-            ->map(fn ($value) => Money::of($value))
-            ->all();
     }
 
     /**

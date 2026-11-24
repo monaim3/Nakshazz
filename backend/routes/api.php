@@ -25,7 +25,7 @@ Route::prefix('v1')->name('v1.')->middleware(['storefront', 'throttle:storefront
 
     Route::post('cart/validate', Storefront\CartController::class)->middleware('throttle:cart')->name('cart.validate');
     Route::post('coupons/apply', Storefront\CartController::class)->middleware('throttle:coupon')->name('coupons.apply');
-    Route::post('checkout', Storefront\CheckoutController::class)->middleware('throttle:checkout')->name('checkout');
+    Route::post('checkout', Storefront\CheckoutController::class)->middleware(['throttle:checkout', 'idempotent'])->name('checkout');
 
     Route::post('orders/track', [Storefront\OrderLookupController::class, 'track'])->middleware('throttle:tracking')->name('orders.track');
     Route::get('orders/{uuid}', [Storefront\OrderLookupController::class, 'show'])->middleware('throttle:tracking')->name('orders.show');

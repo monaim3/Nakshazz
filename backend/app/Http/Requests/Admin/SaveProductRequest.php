@@ -40,6 +40,7 @@ class SaveProductRequest extends FormRequest
             'seo_description' => ['nullable', 'string', 'max:170'],
             'tryon_type' => ['nullable', Rule::enum(TryOnType::class)],
             'tryon_size_mm' => ['nullable', 'integer', 'min:2', 'max:600'],
+            'allow_free_price' => ['sometimes', 'boolean'],
 
             'variants' => [$isCreate ? 'required' : 'sometimes', 'array', 'min:1', 'max:50'],
             'variants.*.id' => ['nullable', 'integer', Rule::exists('product_variants', 'id')->where('product_id', $product?->id ?? 0)],
@@ -71,6 +72,28 @@ class SaveProductRequest extends FormRequest
         return [function ($validator): void {
             if ($validator->errors()->has('variants.*')) {
                 return;
+            }
+
+            // a ৳0 price gives the piece away: only when the owner confirms it is meant to be free
+            if (! $this->boolean('allow_free_price')) {
+                foreach ($this->input('variants', []) as $index => $variant) {
+                    if (isset($variant['price']) && is_numeric($variant['price']) && (float) $variant['price'] === 0.0) {
+                        $validator->errors()->add("variants.{$index}.price", 'A price of ৳0 gives this piece away. Confirm "Free item" if that is intended.');
+                    }
+                }
+            }
+
+            // two variants with the same options (e.g. two "Red / Small") would show twice in the shop
+            $seen = [];
+            foreach ($this->input('variants', []) as $index => $variant) {
+                $options = collect($variant['options'] ?? [])->mapWithKeys(fn ($value, $name) => [mb_strtolower(trim((string) $name)) => mb_strtolower(trim((string) $value))])->sortKeys()->all();
+                $signature = json_encode($options);
+                if (isset($seen[$signature])) {
+                    $validator->errors()->add("variants.{$index}.options", $options === []
+                        ? 'Only one variant can be without options. Give each variant its colour / size.'
+                        : 'Another variant already has exactly these options (row '.($seen[$signature] + 1).').');
+                }
+                $seen[$signature] = $index;
             }
 
             foreach ($this->input('variants', []) as $index => $variant) {

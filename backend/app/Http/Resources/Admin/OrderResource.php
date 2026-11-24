@@ -4,6 +4,8 @@ namespace App\Http\Resources\Admin;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\CustomerMessenger;
+use App\Services\PaymentService;
 use App\Support\Money;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -82,6 +84,15 @@ class OrderResource extends JsonResource
                 ...($canSeeFinancials ? ['unit_cost' => $item->unit_cost, 'cost_breakdown' => $item->cost_breakdown] : []),
             ])),
             'payments' => PaymentResource::collection($this->whenLoaded('payments')),
+            // what the order screen needs to stop over-payments and over-refunds
+            'money' => $this->whenLoaded('payments', fn () => [
+                'amount_due' => app(PaymentService::class)->amountDue($this->resource),
+                'refundable' => app(PaymentService::class)->netReceived($this->resource),
+                'has_pending_payment' => $this->payments->contains(fn ($p) => $p->type->value === 'payment' && $p->status->value === 'pending'),
+                'delivery_refundable' => Money::max(Money::sub($this->delivery_charge, $this->payments->where('type.value', 'refund')->where('status.value', 'verified')->sum('delivery_amount')), '0'),
+            ]),
+            // ready-made WhatsApp messages (opens the chat with the text typed in)
+            'whatsapp' => collect(CustomerMessenger::EVENTS)->mapWithKeys(fn (string $event) => [$event => app(CustomerMessenger::class)->whatsappLink($this->resource, $event)]),
             'status_history' => $this->whenLoaded('statusHistories', fn () => $this->statusHistories->map(fn ($history) => [
                 'from' => $history->from_status,
                 'to' => $history->to_status,

@@ -90,6 +90,11 @@ class Order extends Model
         return $this->hasMany(OrderNote::class)->orderByDesc('created_at')->orderByDesc('id');
     }
 
+    public function returns(): HasMany
+    {
+        return $this->hasMany(OrderItemReturn::class);
+    }
+
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class)->orderBy('id');

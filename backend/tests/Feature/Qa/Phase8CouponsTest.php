@@ -73,8 +73,9 @@ class Phase8CouponsTest extends TestCase
         $this->actingAs($this->owner)->patchJson("/api/v1/admin/coupons/{$coupon->id}", [
             'code' => 'SCHED', 'type' => 'fixed', 'value' => '100', 'starts_at' => $coupon->starts_at->format('Y-m-d H:i'), 'expires_at' => now()->addDays(20)->format('Y-m-d H:i'), 'is_active' => true,
         ])->assertOk();
-        // OBS-19: a partial update without the code (not used by the admin screen) wipes the code and is refused
-        $this->actingAs($this->owner)->patchJson("/api/v1/admin/coupons/{$coupon->id}", ['is_active' => false])->assertJsonValidationErrors('code');
+        // FIXED OBS-19: a partial update without the code keeps the code
+        $this->actingAs($this->owner)->patchJson("/api/v1/admin/coupons/{$coupon->id}", ['is_active' => false])->assertOk();
+        $this->assertSame(['SCHED', false], [$coupon->refresh()->code, $coupon->is_active]);
     }
 
     #[Test]
@@ -189,7 +190,12 @@ class Phase8CouponsTest extends TestCase
         ], $extra));
 
         $sale(['coupon_code' => 'POS100', 'manual_discount' => '50'])->assertCreated()->assertJsonPath('data.grand_total', '850.00');
-        $sale(['coupon_code' => 'POS100', 'manual_discount' => '5000'])->assertCreated()->assertJsonPath('data.grand_total', '0.00');
+        // staff may not give it away (below cost); the owner may, and the total stops at ৳0
+        $sale(['coupon_code' => 'POS100', 'manual_discount' => '5000'])->assertUnprocessable();
+        $this->actingAs($this->owner)->postJson('/api/v1/admin/manual-sales', [
+            'channel' => 'physical_store', 'status' => 'delivered', 'coupon_code' => 'POS100', 'manual_discount' => '5000',
+            'items' => [['variant_id' => $this->variant->id, 'quantity' => 1]], 'payment' => ['method' => 'cash'],
+        ])->assertCreated()->assertJsonPath('data.grand_total', '0.00');
         // OBS: without a phone number the per-phone limit cannot apply — the same walk-in coupon works again
         $this->assertSame(2, Coupon::query()->where('code', 'POS100')->value('used_count'));
     }

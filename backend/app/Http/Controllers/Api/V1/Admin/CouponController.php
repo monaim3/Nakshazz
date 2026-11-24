@@ -52,7 +52,9 @@ class CouponController extends Controller
     private function validated(Request $request, ?Coupon $coupon = null): array
     {
         $required = $coupon ? 'sometimes' : 'required';
-        $request->merge(['code' => $request->filled('code') ? Str::upper(trim((string) $request->input('code'))) : $request->input('code')]);
+        if ($request->has('code')) {
+            $request->merge(['code' => $request->filled('code') ? Str::upper(trim((string) $request->input('code'))) : $request->input('code')]);
+        }
 
         return $request->validate([
             'code' => [$required, 'string', 'max:40', 'regex:/^[A-Z0-9_-]+$/', Rule::unique('coupons', 'code')->ignore($coupon?->id)],

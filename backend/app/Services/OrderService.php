@@ -16,6 +16,7 @@ use App\Models\Customer;
 use App\Models\DeliveryZone;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderItemReturn;
 use App\Models\OrderStatusHistory;
 use App\Models\ProductVariant;
 use App\Models\User;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Creates and moves orders. Website checkout and manual (POS / Facebook / WhatsApp) sales
@@ -37,6 +39,8 @@ class OrderService
         private PricingService $pricing,
         private CouponService $coupons,
         private PaymentService $payments,
+        private StorefrontRevalidator $revalidator,
+        private StoreSettings $settings,
     ) {}
 
     /**
@@ -87,6 +91,8 @@ class OrderService
                 ]);
             }
 
+            $this->refreshShopStock($order);
+
             return $order->refresh();
         });
     }
@@ -114,6 +120,10 @@ class OrderService
 
             if (! in_array($status, [OrderStatus::Delivered, OrderStatus::Confirmed], true)) {
                 throw ValidationException::withMessages(['status' => ['A manual sale starts as delivered or confirmed.']]);
+            }
+
+            if ($data['channel'] === SalesChannel::Website->value) {
+                throw ValidationException::withMessages(['channel' => ['Website orders come from the shop itself. Choose where this sale happened.']]);
             }
 
             $shipping = $data['shipping'] ?? [];
@@ -149,6 +159,8 @@ class OrderService
                 ], $user);
             }
 
+            $this->refreshShopStock($order);
+
             return $order->refresh();
         });
     }
@@ -169,6 +181,17 @@ class OrderService
                 throw new InvalidOrderStateException("Cannot change order from {$from->value} to {$target->value}.");
             }
 
+            // a cancelled order must not keep customer money (owner rule, 2026-11-24)
+            if ($target === OrderStatus::Cancelled) {
+                if ($this->payments->hasPendingPayment($order)) {
+                    throw new InvalidOrderStateException('A bKash payment for this order is still waiting to be checked. Verify it if the money arrived (then refund it), or reject it, before cancelling.');
+                }
+                $held = $this->payments->netReceived($order);
+                if (Money::isPositive($held)) {
+                    throw new InvalidOrderStateException("৳{$held} has been received for this order. Record the refund first, then cancel.");
+                }
+            }
+
             $items = $order->items()->get();
             $variants = $this->inventory->lockVariants($items->pluck('variant_id')->filter());
 
@@ -182,14 +205,18 @@ class OrderService
             }
 
             if ($target === OrderStatus::Returned) {
-                $this->eachItemVariant($items, $variants, function (OrderItem $item, ProductVariant $variant) use ($user): void {
+                foreach ($items as $item) {
                     $remaining = $item->returnableQuantity();
+                    $variant = $variants->get($item->variant_id);
 
                     if ($remaining > 0) {
-                        $this->inventory->receiveReturn($variant, $remaining, 0, $item, $user);
+                        if ($variant !== null) {
+                            $this->inventory->receiveReturn($variant, $remaining, 0, $item, $user);
+                        }
+                        $this->recordReturn($item, $remaining, 0, $user);
                         $item->increment('returned_quantity', $remaining);
                     }
-                });
+                }
             }
 
             $order->fill(array_filter([
@@ -213,6 +240,19 @@ class OrderService
                 }
             }
 
+            if ($target !== OrderStatus::Confirmed && $target !== OrderStatus::Processing) {
+                $this->refreshShopStock($order);
+            }
+
+            // customer SMS only once the change is saved for good
+            DB::afterCommit(function () use ($order, $target): void {
+                try {
+                    app(CustomerMessenger::class)->orderStatusChanged($order, $target);
+                } catch (Throwable $exception) {
+                    report($exception);
+                }
+            });
+
             return $order->refresh();
         });
     }
@@ -221,7 +261,7 @@ class OrderService
      * Partial or full return of shipped / delivered items.
      *
      * @param  list<array{order_item_id: int, quantity: int, damaged?: int|null}>  $returns
-     * @param  array{amount: string, method: string, note?: string|null}|null  $refund
+     * @param  array{amount: string, method: string, note?: string|null, transaction_id?: string|null}|null  $refund
      */
     public function processReturn(Order $order, array $returns, ?array $refund, User $user): Order
     {
@@ -235,6 +275,7 @@ class OrderService
 
             $items = $order->items()->get()->keyBy('id');
             $variants = $this->inventory->lockVariants($items->pluck('variant_id')->filter());
+            $goodsValue = '0';
 
             foreach ($returns as $index => $line) {
                 $item = $items->get($line['order_item_id']);
@@ -255,18 +296,21 @@ class OrderService
                     $this->inventory->receiveReturn($variant, $quantity - $damaged, $damaged, $item, $user);
                 }
 
+                $goodsValue = Money::add($goodsValue, $this->recordReturn($item, $quantity, $damaged, $user)->value);
                 $item->returned_quantity += $quantity;
                 $item->damaged_quantity += $damaged;
                 $item->save();
             }
 
             if ($refund !== null && Money::isPositive($refund['amount'])) {
-                $this->payments->refund($order, $refund['amount'], PaymentMethod::from($refund['method']), RefundReason::Return, $user, $refund['note'] ?? null);
+                $this->payments->refund($order, $refund['amount'], PaymentMethod::from($refund['method']), RefundReason::Return, $user, $refund['note'] ?? null, $goodsValue, $refund['transaction_id'] ?? null);
             }
 
             if ($items->every(fn (OrderItem $item) => $item->returnableQuantity() === 0)) {
                 $this->setStatus($order, OrderStatus::Returned, $user, 'All items returned');
             }
+
+            $this->refreshShopStock($order);
 
             return $order->refresh();
         });
@@ -325,6 +369,9 @@ class OrderService
         }
 
         $totals = $this->pricing->calculate($lines, $couponDiscount, $manualDiscount, $deliveryCharge);
+        if ($source === OrderSource::Manual && $user !== null && ! $user->can('view-financials')) {
+            $this->assertWithinStaffLimits($totals);
+        }
         $customerModel = $phone !== null ? $this->upsertCustomer($phone, $customer, $shipping) : null;
         $zone = $shipping['zone'] ?? null;
 
@@ -401,6 +448,56 @@ class OrderService
         return $order;
     }
 
+    /**
+     * Staff (not the owner) may not sell below cost or give more than the owner's maximum
+     * discount off the list price in New sale. The message never reveals the cost.
+     *
+     * @param  array{lines: list<array{variant: ProductVariant, quantity: int, unit_price: string, unit_cost: string, line_total: string}>, manual_discount: string}  $totals
+     */
+    private function assertWithinStaffLimits(array $totals): void
+    {
+        $list = '0';
+        $net = '0';
+        foreach ($totals['lines'] as $index => $line) {
+            $list = Money::add($list, Money::mul($line['variant']->price, $line['quantity']));
+            $net = Money::add($net, $line['line_total']);
+
+            if (Money::compare($line['line_total'], Money::mul($line['unit_cost'], $line['quantity'])) < 0) {
+                throw ValidationException::withMessages(["items.{$index}.unit_price" => ['This price is below what the piece costs the shop. Ask the owner to record this sale.']]);
+            }
+        }
+
+        $maxPercent = (float) $this->settings->get('staff_max_discount_percent', 20);
+        if (Money::isPositive($list) && (1 - ((float) $net / (float) $list)) * 100 > $maxPercent + 0.001) {
+            throw ValidationException::withMessages(['manual_discount' => ["Staff can give at most {$maxPercent}% off the list price. Ask the owner for a bigger discount."]]);
+        }
+    }
+
+    private function recordReturn(OrderItem $item, int $quantity, int $damaged, ?User $user): OrderItemReturn
+    {
+        return OrderItemReturn::query()->create([
+            'order_id' => $item->order_id,
+            'order_item_id' => $item->id,
+            'quantity' => $quantity,
+            'damaged' => $damaged,
+            'value' => Money::proportion($item->line_total, $quantity, $item->quantity),
+            'user_id' => $user?->id,
+            'returned_at' => now(),
+        ]);
+    }
+
+    /**
+     * Product pages are cached for hours; after stock moves, tell the shop to refresh them
+     * so customers never see "Only 2 left" for something already sold (or "sold out" after
+     * a cancellation freed it).
+     */
+    private function refreshShopStock(Order $order): void
+    {
+        $slugs = $order->items()->with('product:id,slug')->get()->pluck('product.slug')->filter()->unique();
+
+        $this->revalidator->revalidate(['products', 'home', ...$slugs->map(fn (string $slug) => "product:{$slug}")->all()]);
+    }
+
     private function isSellable(ProductVariant $variant, OrderSource $source): bool
     {
         if (! $variant->is_active) {
@@ -439,17 +536,20 @@ class OrderService
      */
     private function upsertCustomer(string $phone, array $customer, array $shipping): Customer
     {
+        // the first name stays: a later order (a gift, a short name) or the shop's own
+        // correction is not overwritten; each order keeps the name typed on it
         $model = Customer::query()->firstOrNew(['phone' => $phone]);
-        $model->name = $customer['name'] ?? $model->name ?? 'Customer';
-        $model->email = $customer['email'] ?? $model->email;
+        $model->name = filled($model->name) ? $model->name : ($customer['name'] ?? 'Customer');
+        $model->email = filled($model->email) ? $model->email : ($customer['email'] ?? null);
         $model->save();
 
         $address = trim((string) ($shipping['address'] ?? ''));
         if ($address !== '' && ! empty($shipping['city'])) {
-            $model->addresses()->updateOrCreate(
+            $saved = $model->addresses()->updateOrCreate(
                 ['address_line' => $address, 'city' => $shipping['city']],
                 ['area' => $shipping['area'] ?? null, 'delivery_zone_id' => ($shipping['zone'] ?? null)?->id, 'is_default' => true],
             );
+            $model->addresses()->whereKeyNot($saved->id)->update(['is_default' => false]);
         }
 
         return $model;

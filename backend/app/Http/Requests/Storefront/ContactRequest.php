@@ -13,6 +13,18 @@ class ContactRequest extends FormRequest
     }
 
     /**
+     * Tags are removed before the checks, so text made only of HTML ("<b></b>") counts as empty.
+     */
+    protected function prepareForValidation(): void
+    {
+        foreach (['name', 'message'] as $field) {
+            if (is_string($this->input($field))) {
+                $this->merge([$field => trim(strip_tags($this->input($field)))]);
+            }
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array

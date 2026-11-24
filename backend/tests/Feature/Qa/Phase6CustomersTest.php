@@ -108,12 +108,13 @@ class Phase6CustomersTest extends TestCase
 
         $customer = Customer::query()->firstOrFail();
         $this->assertSame(2, $customer->addresses()->count());
-        // OBS: every remembered address is flagged default
-        $this->assertSame(2, $customer->addresses()->where('is_default', true)->count());
+        // FIXED: only the latest address is the default
+        $this->assertSame(1, $customer->addresses()->where('is_default', true)->count());
+        $this->assertSame('Flat 5C, Lake View', $customer->addresses()->where('is_default', true)->value('address_line'));
     }
 
     #[Test]
-    public function c6_a_later_order_overwrites_the_name_the_shop_edited(): void
+    public function c6_fixed_a_later_order_keeps_the_name_the_shop_edited(): void
     {
         $this->postJson('/api/v1/checkout', $this->payload('01712345678', name: 'rina'))->assertCreated();
         $customer = Customer::query()->firstOrFail();
@@ -123,7 +124,8 @@ class Phase6CustomersTest extends TestCase
         $this->postJson('/api/v1/checkout', $this->payload('01712345678', name: 'Sister Mitu'))->assertCreated();
 
         $customer->refresh();
-        $this->assertSame('Sister Mitu', $customer->name, 'OBS: the edited name is replaced by the latest order');
+        $this->assertSame('Rina Akter (VIP)', $customer->name, 'FIXED (my call 8): the name is filled only when empty');
+        $this->assertSame('Sister Mitu', Order::query()->latest('id')->value('customer_name'), 'the new order keeps the name typed on it');
         $this->assertSame('Prefers gold', $customer->notes, 'notes survive');
         $this->assertSame('rina', Order::query()->oldest('id')->value('customer_name'), 'each order keeps the name typed on it');
     }

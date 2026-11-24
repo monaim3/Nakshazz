@@ -41,7 +41,11 @@ class StoreSettings
     public function update(array $values): void
     {
         foreach ($values as $key => $value) {
-            StoreSetting::query()->whereKey($key)->update(['value' => json_encode($value)]);
+            // settings added after the first install have no row yet: create them (private)
+            $updated = StoreSetting::query()->whereKey($key)->update(['value' => json_encode($value)]);
+            if ($updated === 0 && ! StoreSetting::query()->whereKey($key)->exists()) {
+                StoreSetting::query()->create(['key' => $key, 'value' => $value, 'is_public' => false]);
+            }
         }
 
         $this->flush();

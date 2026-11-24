@@ -42,7 +42,7 @@ class ProductService
         DB::transaction(function () use ($product, $data, $user, $canEditCosts): void {
             $slugSource = ! empty($data['slug']) ? $data['slug'] : ($data['name'] ?? $product->name);
 
-            $product->fill(Arr::except($data, ['variants', 'slug']));
+            $product->fill(Arr::except($data, ['variants', 'slug', 'allow_free_price']));
             $product->slug = $this->uniqueSlug($slugSource, $product->id);
             $product->save();
 

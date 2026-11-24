@@ -13,6 +13,7 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -116,6 +117,17 @@ class ExpenseController extends Controller
         ]);
 
         $expense->fill(Arr::except($data, ['attachment']));
+
+        // the same bill typed twice: ask before saving a second copy
+        $twin = ! $request->boolean('confirm_duplicate') && Expense::query()
+            ->whereKeyNot($expense->id)
+            ->where('expense_category_id', $expense->expense_category_id)
+            ->whereDate('expense_date', $expense->expense_date)
+            ->where('amount', $expense->amount)
+            ->exists();
+        if ($twin) {
+            throw ValidationException::withMessages(['duplicate' => ['An expense with the same category, amount and date is already saved. Save anyway?']]);
+        }
 
         if ($request->hasFile('attachment')) {
             if ($expense->attachment_path) {

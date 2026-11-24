@@ -3,7 +3,6 @@
 namespace App\Notifications;
 
 use App\Models\Order;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -21,12 +20,12 @@ class NewWebsiteOrder extends Notification
     /**
      * @return array<int, string>
      */
-    public function via(User $notifiable): array
+    public function via(object $notifiable): array
     {
         return ['mail'];
     }
 
-    public function toMail(User $notifiable): MailMessage
+    public function toMail(object $notifiable): MailMessage
     {
         $order = $this->order->loadMissing('items');
         $money = fn (string $amount): string => '৳'.number_format((float) $amount, 0);

@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class OrderController extends Controller
 {
@@ -95,6 +96,13 @@ class OrderController extends Controller
             'tracking_code' => ['sometimes', 'nullable', 'string', 'max:100'],
             'delivery_cost' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:999999', 'decimal:0,2'],
         ]);
+
+        // the address is history once the parcel is delivered, returned or the order cancelled;
+        // courier, tracking and courier cost stay editable (the courier bill comes later)
+        $addressFields = array_intersect(array_keys($data), ['shipping_address', 'shipping_area', 'shipping_city']);
+        if ($addressFields !== [] && in_array($order->status, [OrderStatus::Delivered, OrderStatus::Returned, OrderStatus::Cancelled], true)) {
+            throw ValidationException::withMessages(['shipping_address' => ["The address of a {$order->status->value} order can no longer be changed."]]);
+        }
 
         if (array_key_exists('delivery_cost', $data) && $data['delivery_cost'] !== null) {
             $data['delivery_cost'] = Money::of($data['delivery_cost']);

@@ -301,12 +301,15 @@ class Phase3OrderLifecycleTest extends TestCase
     }
 
     #[Test]
-    public function l14_observation_shipping_can_still_be_edited_on_cancelled_and_delivered_orders(): void
+    public function l14_fixed_address_is_locked_once_an_order_is_finished_courier_cost_is_not(): void
     {
         $order = $this->webOrder($this->variant(stock: 5), 1);
         $this->move($order, 'cancelled');
 
-        $this->actingAs($this->staff)->patchJson("/api/v1/admin/orders/{$order->id}/shipping", ['shipping_address' => 'Changed after cancel', 'delivery_cost' => '120'])->assertOk();
+        // FIXED (my call 6): the address is part of the record once cancelled / delivered / returned
+        $this->actingAs($this->staff)->patchJson("/api/v1/admin/orders/{$order->id}/shipping", ['shipping_address' => 'Changed after cancel'])->assertJsonValidationErrors('shipping_address');
+        // the courier bill often arrives later, so its cost stays editable
+        $this->actingAs($this->staff)->patchJson("/api/v1/admin/orders/{$order->id}/shipping", ['delivery_cost' => '120'])->assertOk();
         $this->assertSame('120.00', $order->refresh()->delivery_cost);
     }
 

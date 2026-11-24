@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
-    'order_id', 'type', 'method', 'amount', 'fee', 'transaction_id', 'sender_number',
+    'order_id', 'type', 'method', 'amount', 'fee', 'delivery_amount', 'goodwill_amount', 'transaction_id', 'rejected_transaction_id', 'sender_number',
     'status', 'refund_reason', 'verified_by', 'verified_at', 'paid_at', 'gateway_payload',
     'note', 'created_by',
 ])]
@@ -29,6 +29,8 @@ class Payment extends Model
             'refund_reason' => RefundReason::class,
             'amount' => 'decimal:2',
             'fee' => 'decimal:2',
+            'delivery_amount' => 'decimal:2',
+            'goodwill_amount' => 'decimal:2',
             'gateway_payload' => 'array',
             'verified_at' => 'datetime',
             'paid_at' => 'datetime',

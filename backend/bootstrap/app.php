@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\EnsureStorefrontCaller;
 use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\Idempotent;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -34,7 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/v1/products/*/reviews',
             'api/v1/contact',
         ]);
-        $middleware->alias(['active' => EnsureUserIsActive::class, 'storefront' => EnsureStorefrontCaller::class]);
+        $middleware->alias(['active' => EnsureUserIsActive::class, 'storefront' => EnsureStorefrontCaller::class, 'idempotent' => Idempotent::class]);
+        $middleware->append(SecurityHeaders::class);
         // API only: there is no login page to send a guest to. Without this, opening an admin
         // address in a browser tab crashed with "Route [login] not defined" instead of a 401.
         $middleware->redirectGuestsTo(fn () => null);

@@ -131,25 +131,25 @@ class StorefrontApiTest extends TestCase
     }
 
     #[Test]
-    public function new_website_order_emails_the_active_shop_team(): void
+    public function new_website_order_emails_the_owner_when_no_address_is_set(): void
     {
         Notification::fake();
         $this->withoutDefer();
         $owner = User::factory()->create(['role' => 'owner']);
         $staff = User::factory()->create(['role' => 'staff']);
-        $former = User::factory()->create(['role' => 'staff', 'is_active' => false]);
+        $former = User::factory()->create(['role' => 'owner', 'is_active' => false]);
         $variant = $this->product()->variants->first();
 
         $orderNumber = $this->postJson('/api/v1/checkout', $this->checkoutPayload($variant))->assertCreated()->json('data.order_number');
 
-        Notification::assertSentTo([$owner, $staff], NewWebsiteOrder::class, function (NewWebsiteOrder $notification, array $channels, User $user) use ($orderNumber) {
+        Notification::assertSentTo($owner, NewWebsiteOrder::class, function (NewWebsiteOrder $notification, array $channels, User $user) use ($orderNumber) {
             $mail = $notification->toMail($user);
 
             return $notification->order->order_number === $orderNumber
                 && str_contains($mail->subject, $orderNumber)
                 && str_ends_with($mail->actionUrl, "/admin/orders/{$notification->order->id}");
         });
-        Notification::assertNotSentTo($former, NewWebsiteOrder::class);
+        Notification::assertNotSentTo([$staff, $former], NewWebsiteOrder::class);
     }
 
     #[Test]

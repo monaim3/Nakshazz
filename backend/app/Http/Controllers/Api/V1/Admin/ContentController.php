@@ -88,7 +88,7 @@ class ContentController extends Controller
         $data = $request->validate([
             'title' => [$isNew ? 'required' : 'sometimes', 'string', 'max:150'],
             'subtitle' => ['nullable', 'string', 'max:255'],
-            'link_url' => ['nullable', 'string', 'max:255', 'regex:#^(/|https://)#'],
+            'link_url' => ['nullable', 'string', 'max:255', 'regex:#^(/(?!/)|https://)#'],
             'button_text' => ['nullable', 'string', 'max:40'],
             'placement' => [$isNew ? 'required' : 'sometimes', Rule::enum(BannerPlacement::class)],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:1000'],

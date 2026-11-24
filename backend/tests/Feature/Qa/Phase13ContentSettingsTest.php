@@ -131,8 +131,8 @@ class Phase13ContentSettingsTest extends TestCase
         $make(['title' => 'Later', 'starts_at' => now()->addDay()->format('Y-m-d H:i')])->assertSuccessful();
         $make(['title' => 'Over', 'starts_at' => now()->subDays(3)->format('Y-m-d H:i'), 'ends_at' => now()->subDay()->format('Y-m-d H:i')])->assertSuccessful();
         $make(['title' => 'Off', 'is_active' => 0])->assertSuccessful();
-        // OBS-24: a link starting with "//" passes the check and leaves the site
-        $make(['title' => 'Away', 'link_url' => '//other-site.example/login', 'is_active' => 0])->assertSuccessful();
+        // FIXED OBS-24: a link starting with "//" would leave the site, so it is refused
+        $make(['title' => 'Away', 'link_url' => '//other-site.example/login', 'is_active' => 0])->assertJsonValidationErrors('link_url');
 
         $this->assertSame(['First', 'Second'], array_column($this->getJson('/api/v1/home')->json('data.promo_banners'), 'title'));
 

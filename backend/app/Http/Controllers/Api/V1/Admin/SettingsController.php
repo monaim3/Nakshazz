@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeliveryZone;
+use App\Services\ActivityLogger;
 use App\Services\ImageProcessor;
 use App\Services\StorefrontRevalidator;
 use App\Services\StoreSettings;
@@ -31,7 +32,7 @@ class SettingsController extends Controller
         ]]);
     }
 
-    public function update(Request $request, ImageProcessor $images): JsonResponse
+    public function update(Request $request, ImageProcessor $images, ActivityLogger $log): JsonResponse
     {
         $phone = ['nullable', 'string', 'max:20'];
 
@@ -51,6 +52,12 @@ class SettingsController extends Controller
             'bkash_instructions' => ['nullable', 'string', 'max:500'],
             'low_stock_threshold' => ['sometimes', 'integer', 'min:0', 'max:1000'],
             'order_notification_email' => ['nullable', 'email:rfc', 'max:150'],
+            'staff_max_discount_percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'reorder_cover_days' => ['sometimes', 'integer', 'min:1', 'max:365'],
+            'sms_enabled' => ['sometimes', 'boolean'],
+            'sms_on_confirmed' => ['sometimes', 'boolean'],
+            'sms_on_shipped' => ['sometimes', 'boolean'],
+            'sms_on_delivered' => ['sometimes', 'boolean'],
             'logo' => ['nullable', 'file', 'image', 'mimes:png,jpg,jpeg,webp', 'max:4096'],
         ]);
 
@@ -65,7 +72,9 @@ class SettingsController extends Controller
             $values['logo_path'] = $images->storeSingle($request->file('logo'), 'branding', 800);
         }
 
+        $before = collect($this->settings->all())->map(fn (array $setting) => $setting['value'])->all();
         $this->settings->update($values);
+        $log->settingsChanged($before, Arr::except($values, ['logo_path']) + (isset($values['logo_path']) ? ['logo' => 'new logo'] : []));
         $this->revalidator->revalidate(['settings', 'home']);
 
         return $this->show();

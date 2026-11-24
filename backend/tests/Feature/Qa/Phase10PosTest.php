@@ -140,32 +140,45 @@ class Phase10PosTest extends TestCase
     }
 
     #[Test]
-    public function p8_staff_can_change_the_price_to_anything_including_free(): void
+    public function p8_fixed_staff_cannot_sell_below_cost_or_past_the_discount_limit(): void
     {
-        $free = $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '0']]])->assertCreated()->json('data');
+        // FIXED (my call 1): below cost is refused for staff, and so is more than the owner's max discount (20%)
+        $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '0']]])->assertJsonValidationErrors('items.0.unit_price');
+        $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '100']]])->assertJsonValidationErrors('items.0.unit_price');
+        $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '750']]])->assertUnprocessable();
+        $this->assertStringNotContainsString('450', $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '100']]])->json('message'), 'the message never tells staff the cost');
+        $this->assertSame(10, $this->a->refresh()->stock_on_hand, 'refused sales took no stock');
+
+        // inside the limit is fine; the owner may still give a piece away
+        $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '850']]])->assertCreated();
+        $free = $this->actingAs($this->owner)->postJson('/api/v1/admin/manual-sales', [
+            'channel' => 'physical_store', 'status' => 'delivered',
+            'items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '0']],
+            'payment' => ['method' => 'cash'],
+        ])->assertCreated()->json('data');
         $this->assertSame('0.00', $free['grand_total']);
-        $below = $this->sale(['items' => [['variant_id' => $this->a->id, 'quantity' => 1, 'unit_price' => '100']], 'manual_discount' => '100'])->assertCreated()->json('data');
-        $this->assertSame('0.00', $below['grand_total']);
-
-        // the order keeps who did it, but nothing asks the owner and the dashboard does not flag it
-        $this->assertSame($this->staff->id, Order::query()->find($free['id'])->created_by);
-        $this->assertSame('-900.00', app(ReportService::class)->summary(CarbonImmutable::today(), CarbonImmutable::today())['realized']['gross_profit'], '2 jhumkas given away = 2 × −450');
     }
 
     #[Test]
-    public function p9_a_counter_sale_can_be_filed_under_the_website_channel(): void
+    public function p9_fixed_a_counter_sale_cannot_be_filed_under_the_website_channel(): void
     {
-        $this->sale(['channel' => 'website'])->assertCreated();
-        $channels = collect(app(ReportService::class)->byChannel(CarbonImmutable::today(), CarbonImmutable::today()))->keyBy('channel');
-        $this->assertArrayHasKey('website', $channels->all(), 'staff sale counted as website sales');
+        $this->sale(['channel' => 'website'])->assertJsonValidationErrors('channel');
+        $this->assertSame(0, Order::query()->count());
     }
 
     #[Test]
-    public function p10_the_same_sale_sent_twice_is_recorded_twice(): void
+    public function p10_fixed_the_same_sale_retried_with_one_key_is_recorded_once(): void
     {
+        // two separate sales (no key) are still two sales
         $this->sale([])->assertCreated();
         $this->sale([])->assertCreated();
         $this->assertSame(8, $this->a->refresh()->stock_on_hand);
+
+        // a retry of one attempt carries the same Idempotency-Key and is done once
+        $payload = ['channel' => 'physical_store', 'status' => 'delivered', 'items' => [['variant_id' => $this->a->id, 'quantity' => 1]], 'payment' => ['method' => 'cash']];
+        $this->actingAs($this->staff)->postJson('/api/v1/admin/manual-sales', $payload, ['Idempotency-Key' => 'tap-1'])->assertCreated();
+        $this->actingAs($this->staff)->postJson('/api/v1/admin/manual-sales', $payload, ['Idempotency-Key' => 'tap-1'])->assertCreated()->assertHeader('Idempotent-Replayed', 'true');
+        $this->assertSame(7, $this->a->refresh()->stock_on_hand);
     }
 
     #[Test]

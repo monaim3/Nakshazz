@@ -17,6 +17,7 @@ use App\Models\Payment;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Services\InventoryService;
+use App\Services\OperationsService;
 use App\Services\OrderService;
 use App\Services\PaymentService;
 use App\Services\ProductService;
@@ -37,8 +38,8 @@ use Tests\TestCase;
  *
  * A shadow ledger is kept in plain PHP from the simulation's own inputs — never read back
  * from the database — and compared with the app every day and at month end:
- *  - "app rules": the app's documented definitions (sale and its returns dated by delivery)
- *  - "owner rules": the owner's decisions (refunded delivery lowers income, BUG-006)
+ *  - a sale counts on its delivery day; a return, a refunded delivery charge and goodwill
+ *    count on the day they happen (owner's DECISION-1 and rule Q2) — so closed days never move
  * The report is written to STDERR between QA-SIM-BEGIN / QA-SIM-END.
  */
 #[Group('qa')]
@@ -205,7 +206,9 @@ class Phase15MonthSimulationTest extends TestCase
         $channel = match (true) {
             $k % 7 === 3 => 'store', $k % 9 === 4 => 'facebook', default => 'web'
         };
-        $method = match ($channel) { 'store' => 'cash', 'facebook' => 'cod', default => $k % 6 === 1 ? 'bkash' : 'cod' };
+        $method = match ($channel) {
+            'store' => 'cash', 'facebook' => 'cod', default => $k % 6 === 1 ? 'bkash' : 'cod'
+        };
         $zone = $k % 4 === 0 ? $this->outside : $this->inside;
 
         // Tiny Moon Studs is popular in week 3 until it sells out
@@ -312,7 +315,7 @@ class Phase15MonthSimulationTest extends TestCase
                 if ($o['paid'] - $o['refunded'] > 0) {
                     // owner's rule: refund first, then cancel
                     $amount = $o['paid'] - $o['refunded'];
-                    app(PaymentService::class)->refund($order, (string) $amount, PaymentMethod::Bkash, RefundReason::Compensation, $this->owner, 'Customer cancelled');
+                    app(PaymentService::class)->refund($order, (string) $amount, PaymentMethod::Bkash, RefundReason::Cancellation, $this->owner, 'Customer cancelled', transactionId: 'CXL'.str_pad((string) $orderId, 8, '0', STR_PAD_LEFT));
                     $this->paidBack($orderId, $date, $amount);
                 }
                 $service->transition($order, OrderStatus::Cancelled, $this->staff);
@@ -355,10 +358,12 @@ class Phase15MonthSimulationTest extends TestCase
                 $refund = $action === 'return_full_with_delivery' ? $value + $o['delivery'] : $value;
                 $service->processReturn($order, [['order_item_id' => $item->id, 'quantity' => $back, 'damaged' => $damaged]], ['amount' => (string) $refund, 'method' => 'cash'], $this->owner);
                 $this->stock[$v['id']][0] += $back - $damaged;
-                // app rules: revenue and cost of the returned units come off the delivery day
-                $this->ledger($o['delivered_on'])['revenue'] -= $value;
-                $this->ledger($o['delivered_on'])['cogs'] -= (float) $v['cost'] * ($back - $damaged);
+                // revenue and cost of the returned (sellable) units come off the day of the return
+                $this->ledger($date)['revenue'] -= $value;
+                $this->ledger($date)['cogs'] -= (float) $v['cost'] * ($back - $damaged);
                 if ($action === 'return_full_with_delivery') {
+                    // rule Q2: the refunded delivery charge lowers delivery income, on the refund day
+                    $this->ledger($date)['delivery_income'] -= $o['delivery'];
                     $this->deliveryRefunded += $o['delivery'];
                 }
                 $this->paidBack($orderId, $date, $refund);
@@ -366,7 +371,7 @@ class Phase15MonthSimulationTest extends TestCase
                 break;
             case 'goodwill':
                 app(PaymentService::class)->refund($order, '100', PaymentMethod::Bkash, RefundReason::Compensation, $this->owner, 'Late delivery');
-                $this->ledger($o['delivered_on'])['compensation'] += 100;
+                $this->ledger($date)['compensation'] += 100;
                 $this->paidBack($orderId, $date, 100);
                 $this->counts['goodwill']++;
                 // staff try the same once and are refused
@@ -469,8 +474,10 @@ class Phase15MonthSimulationTest extends TestCase
         $appOwed = Order::query()->whereIn('status', ['pending', 'confirmed', 'processing', 'shipped'])->get()->sum(fn ($o) => (float) app(PaymentService::class)->amountDue($o));
         $this->assertSame($money($owed), $money($appOwed));
 
-        $stockValue = ProductVariant::query()->get()->sum(fn ($v) => $v->stock_on_hand * (float) $v->raw_material_cost);
-        $ownerNet = $this->net($total) - $this->deliveryRefunded;
+        $stockValue = ProductVariant::query()->get()->sum(fn ($v) => max(0, $v->stock_on_hand) * (float) $v->total_cost);
+        $this->assertSame($money($stockValue), app(OperationsService::class)->stockValue()['at_cost'], 'stock value');
+        // the owner's rules are now the app's rules: one net profit
+        $ownerNet = $this->net($total);
         $statusCounts = Order::query()->selectRaw('status, COUNT(*) c')->groupBy('status')->pluck('c', 'status')->all();
         ksort($statusCounts);
 

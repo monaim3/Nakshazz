@@ -37,12 +37,12 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
     Route::post('orders/{order}/status', [Admin\OrderController::class, 'updateStatus'])->name('orders.status');
     Route::patch('orders/{order}/shipping', [Admin\OrderController::class, 'updateShipping'])->name('orders.shipping');
     Route::post('orders/{order}/notes', [Admin\OrderController::class, 'storeNote'])->name('orders.notes');
-    Route::post('orders/{order}/returns', [Admin\OrderController::class, 'storeReturn'])->name('orders.returns');
-    Route::post('manual-sales', [Admin\OrderController::class, 'storeManual'])->name('manual-sales.store');
+    Route::post('orders/{order}/returns', [Admin\OrderController::class, 'storeReturn'])->middleware('idempotent')->name('orders.returns');
+    Route::post('manual-sales', [Admin\OrderController::class, 'storeManual'])->middleware('idempotent')->name('manual-sales.store');
 
     // Payments
     Route::get('payments/pending', [Admin\PaymentController::class, 'pending'])->name('payments.pending');
-    Route::post('orders/{order}/payments', [Admin\PaymentController::class, 'store'])->name('orders.payments.store');
+    Route::post('orders/{order}/payments', [Admin\PaymentController::class, 'store'])->middleware('idempotent')->name('orders.payments.store');
     Route::post('payments/{payment}/verify', [Admin\PaymentController::class, 'verify'])->name('payments.verify');
     Route::post('payments/{payment}/reject', [Admin\PaymentController::class, 'reject'])->name('payments.reject');
 
@@ -65,12 +65,18 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     // Owner only: money and store-wide control
     Route::middleware('can:view-financials')->group(function () {
-        Route::post('orders/{order}/refunds', [Admin\PaymentController::class, 'refund'])->name('orders.refunds');
+        Route::post('orders/{order}/refunds', [Admin\PaymentController::class, 'refund'])->middleware('idempotent')->name('orders.refunds');
 
         Route::get('reports/summary', [Admin\ReportController::class, 'summary'])->name('reports.summary');
         Route::get('reports/channels', [Admin\ReportController::class, 'channels'])->name('reports.channels');
         Route::get('reports/products', [Admin\ReportController::class, 'products'])->name('reports.products');
         Route::get('reports/monthly', [Admin\ReportController::class, 'monthly'])->name('reports.monthly');
+
+        Route::get('closing', [Admin\OperationsController::class, 'closing'])->name('closing.show');
+        Route::post('closing', [Admin\OperationsController::class, 'saveClosing'])->name('closing.save');
+        Route::get('restock', [Admin\OperationsController::class, 'restock'])->name('restock');
+        Route::get('activity', Admin\ActivityController::class)->name('activity');
+        Route::get('exports/{type}', Admin\ExportController::class)->name('exports');
 
         Route::get('expenses', [Admin\ExpenseController::class, 'index'])->name('expenses.index');
         Route::post('expenses', [Admin\ExpenseController::class, 'store'])->name('expenses.store');

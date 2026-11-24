@@ -154,12 +154,13 @@ class Phase12SecurityTest extends TestCase
         $this->assertSame(1, Order::query()->count());
 
         // stored as typed; the shop and admin print it as text (React escapes it; the only raw HTML is the product JSON-LD, which escapes "<")
-        $this->postJson('/api/v1/contact', ['name' => '<img src=x onerror=alert(1)>', 'phone' => '01712345678', 'message' => '<script>alert("x")</script> hello there'])->assertCreated();
-        // the server also strips tags from contact messages and reviews before saving (defence in depth)
+        // FIXED OBS-23: tags are stripped before the check, so a name made only of tags is refused
+        $this->postJson('/api/v1/contact', ['name' => '<img src=x onerror=alert(1)>', 'phone' => '01712345678', 'message' => 'hello there friend'])->assertJsonValidationErrors('name');
+        $this->postJson('/api/v1/contact', ['name' => '<b>Rina</b>', 'phone' => '01712345678', 'message' => '<script>alert("x")</script> hello there'])->assertCreated();
+        // the server strips tags from contact messages and reviews before saving (defence in depth)
         $message = $this->getJson('/api/v1/admin/messages')->json('data.0');
         $this->assertStringNotContainsString('<', $message['name'].$message['message']);
-        // OBS-23: a name made only of tags is saved empty although a name is required
-        $this->assertSame('', $message['name']);
+        $this->assertSame('Rina', $message['name']);
     }
 
     #[Test]

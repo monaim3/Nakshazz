@@ -136,10 +136,12 @@ class Phase2AdminModulesTest extends TestCase
     }
 
     #[Test]
-    public function p2_observation_zero_price_and_compare_at_below_price_are_accepted(): void
+    public function p2_fixed_zero_price_needs_free_item_confirmation(): void
     {
-        // No rule forbids a ৳0 product or a "was" price lower than the price. Recorded as an observation.
-        $this->actingAs($this->owner)->postJson('/api/v1/admin/products', $this->productPayload([], [['sku' => 'ZERO-1', 'price' => '0', 'compare_at_price' => '0']]))->assertCreated();
+        // FIXED (my call 11): a ৳0 price is refused unless "Free item" is ticked
+        $this->actingAs($this->owner)->postJson('/api/v1/admin/products', $this->productPayload([], [['sku' => 'ZERO-1', 'price' => '0']]))->assertJsonValidationErrors('variants.0.price');
+        $this->actingAs($this->owner)->postJson('/api/v1/admin/products', $this->productPayload(['allow_free_price' => true], [['sku' => 'ZERO-1', 'price' => '0']]))->assertCreated();
+        // a "was" price lower than the price is still accepted (the shop simply shows no discount)
         $this->actingAs($this->owner)->postJson('/api/v1/admin/products', $this->productPayload([], [['sku' => 'LOWCMP-1', 'price' => '500', 'compare_at_price' => '300']]))->assertCreated();
     }
 

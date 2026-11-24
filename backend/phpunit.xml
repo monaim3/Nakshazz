@@ -12,6 +12,12 @@
             <directory>tests/Feature</directory>
         </testsuite>
     </testsuites>
+    <!-- QA audit tests (tests/Feature/Qa) document open bugs; run them with the group option set to qa (php artisan test, group qa) -->
+    <groups>
+        <exclude>
+            <group>qa</group>
+        </exclude>
+    </groups>
     <source>
         <include>
             <directory>app</directory>

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Qa;
 
-use App\Enums\OrderStatus;
 use App\Models\Category;
 use App\Models\DeliveryZone;
 use App\Models\InventoryMovement;
